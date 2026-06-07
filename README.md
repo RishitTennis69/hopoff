@@ -1,56 +1,68 @@
-# Welcome to your Expo app 👋
+# HopOff
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Stop scrolling. Start living. HopOff helps you cut screen time by intervening with your own
+motivational videos the moment you hit a limit — and by turning wasted hours into the goals that
+actually matter.
 
-## Get started
+This repo is a cross-platform **React Native + Expo (TypeScript)** prototype. Every screen is
+high-fidelity UI backed by working local state (persisted on-device), animations, and haptics. The
+real OS-level blocking (Apple Screen Time / Android Accessibility) is stubbed for a later native
+phase — see [Roadmap](#roadmap).
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Getting started
 
 ```bash
-npm run reset-project
+npm install
+npx expo start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Then press `i` (iOS simulator), `a` (Android emulator), or scan the QR code with the **Expo Go** app
+on your phone. The hour-wheel haptics are best felt on a real device.
 
-### Other setup steps
+## What's implemented
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+- **Welcome** — "Stop scrolling. Start living." with a looping motivational video and the start CTA.
+- **Onboarding** (7 steps) — value-prop intro, quick personalization questions, pick/group apps,
+  weekly goals + connect (Notes/Reminders/Notion), add 3+ videos (gated), system permissions, paywall.
+- **Apps & Limits** — select apps, combine them into **groups** with a single shared limit
+  (YouTube and YouTube Shorts are separate items).
+- **Group creation popup** — editable name + a draggable **hour wheel** with escalating haptic
+  resistance as hours increase.
+- **Collection** — search a topic to load videos (`+` to add), or import from TikTok / Instagram
+  saved with multi-select and a "N videos added" confirmation.
+- **Goals** — weekly goals with a voice-to-text affordance and service connections.
+- **Dashboard** — stats, commit-vs-waste rate, a personalized "that's enough time to..." list, a
+  tappable 5-day bar chart, and per-day soft spots with a change-limits CTA.
+- **Block / Intervention** — personalized reveal, your video, a task-aware "I'll commit to do
+  better" button, and a delayed-fade "I'm going to waste my life..." dismiss link. (Preview it from
+  the bottom of the Dashboard.)
 
-## Learn more
+## Tech
 
-To learn more about developing your project with Expo, look at the following resources:
+- `expo-router` for navigation (tabs + onboarding stack + modal routes)
+- `zustand` + `@react-native-async-storage/async-storage` for persisted state (`src/store`)
+- `react-native-reanimated` + `react-native-gesture-handler` for the wheel and reveal animations
+- `react-native-svg` for the hour wheel, bar chart, and brand glyphs
+- `expo-haptics` for the escalating wheel feedback
+- `expo-video` for video playback
+- `@expo-google-fonts/nunito` for the heavy rounded display type
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Project structure
 
-## Join the community
+```
+src/
+  app/            expo-router routes (index, block, modals, (tabs)/, onboarding/)
+  components/     reusable UI (AppText, Card, PillButton, HourWheel, BarChart, VideoCard, ...)
+  features/       composed screen sections reused across tabs + onboarding
+  store/          zustand persisted stores
+  data/           mock data (apps, videos, stats, onboarding questions)
+  theme/          colors, spacing, radii, typography, brand colors
+```
 
-Join our community of developers creating universal apps.
+## Roadmap (native phase)
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+These require native modules and platform entitlements, so they're mocked for now:
+
+- Real app blocking via Apple `FamilyControls`/`DeviceActivity` and Android Accessibility Services
+- Live TikTok / Instagram "saved" access and the TikTok share-sheet "Add to HopOff" target
+- Voice-to-text wiring and habit-builder suggestions driven by real usage data
