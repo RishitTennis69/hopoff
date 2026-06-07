@@ -156,7 +156,7 @@ export default function OnboardingPaywall() {
       </GlassCard>
 
       <AppText variant="subheading" color={colors.text} style={{ marginBottom: spacing.md }}>
-        Enjoying HopOff?
+        If you are enjoying HopOff
       </AppText>
 
       <View style={{ gap: spacing.md }}>

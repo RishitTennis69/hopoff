@@ -230,11 +230,12 @@ export function CollectionManager({ onSelectModeChange }: Props = {}) {
       )}
 
       {!isSelectMode && (
-        <View style={{ gap: spacing.xs, marginBottom: spacing.xs }}>
+        <View style={{ marginBottom: spacing.xs }}>
           <AppText variant="subheading" color={colors.text}>
             Add your own videos
           </AppText>
-          <SearchBar
+          <View style={{ marginTop: spacing.md }}>
+            <SearchBar
             variant="dark"
             placeholder='Try "discipline motivation" or a creator you follow'
             value={input}
@@ -243,6 +244,7 @@ export function CollectionManager({ onSelectModeChange }: Props = {}) {
             onClear={cancelSearch}
             activeSearch={!!query}
           />
+          </View>
         </View>
       )}
 

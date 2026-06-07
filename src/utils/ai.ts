@@ -4,7 +4,7 @@ import { buildTimeInsights } from './goalInsights';
 import { polishBrainDump } from './polishGoals';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const DEFAULT_MODEL = 'google/gemini-2.0-flash-001';
+const DEFAULT_MODEL = 'google/gemini-2.5-flash';
 
 function model() {
   return process.env.EXPO_PUBLIC_OPENROUTER_MODEL?.trim() || DEFAULT_MODEL;
@@ -62,7 +62,16 @@ export async function polishGoalsWithAi(raw: string): Promise<string> {
   if (!trimmed) return '';
 
   const result = await chat(
-    `You are a focus coach for a screen-time reduction app. Rewrite a messy voice brain-dump into a clear weekly goals list. Do MORE than reformat: merge duplicate or related thoughts, drop filler and vague wishes, make each goal concrete and action-oriented (start with a verb), and add a light specific detail or cadence when the intent implies one (e.g. "read more" -> "Read 20 pages before bed", "gym" -> "Train 3x this week"). Return 3-5 goals, one per line, no numbering, bullets, or preamble. Keep each line under 12 words. Never invent goals the user did not imply.`,
+    `You are a focus coach for a screen-time reduction app. Rewrite a messy voice brain-dump into a tight weekly goals list.
+
+Rules:
+- Return 3–5 goals, one per line, no numbers or bullets
+- Start each line with a strong verb (Train, Read, Finish, Call, etc.)
+- Merge duplicates; drop filler and vague wishes
+- Make goals concrete: add cadence or scope when implied ("gym" → "Train 3x this week")
+- Edit for clarity: fix grammar, shorten run-ons, consistent sentence case
+- No trailing periods; max 10 words per line
+- Never invent goals the user did not imply`,
     trimmed,
   );
 
@@ -72,7 +81,11 @@ export async function polishGoalsWithAi(raw: string): Promise<string> {
     .split('\n')
     .map((l) => l.replace(/^[\d•\-*.)\s]+/, '').replace(/\s+/g, ' ').trim())
     .filter((l) => l.length > 2)
-    .map((l) => l.charAt(0).toUpperCase() + l.slice(1));
+    .map((l) => {
+      let s = l.replace(/\.+$/, '').trim();
+      s = s.charAt(0).toUpperCase() + s.slice(1);
+      return s;
+    });
 
   return lines.length ? lines.slice(0, 5).join('\n') : polishBrainDump(trimmed);
 }

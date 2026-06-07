@@ -1,4 +1,4 @@
-import { Pressable, TextInput, View } from 'react-native';
+import { Platform, Pressable, TextInput, type TextStyle, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { colors, fonts, glass, radii, spacing } from '@/theme';
 
@@ -12,6 +12,11 @@ type Props = {
   activeSearch?: boolean;
   variant?: 'light' | 'dark';
 };
+
+const noFocusRing: TextStyle =
+  Platform.OS === 'web'
+    ? ({ outlineWidth: 0 } as TextStyle)
+    : { borderWidth: 0 };
 
 export function SearchBar({
   placeholder = 'Search...',
@@ -56,12 +61,18 @@ export function SearchBar({
         placeholderTextColor={dark ? colors.textMuted : colors.cardMuted}
         onSubmitEditing={submit}
         returnKeyType="search"
-        style={{
-          flex: 1,
-          fontFamily: fonts.semibold,
-          fontSize: 15,
-          color: dark ? colors.text : colors.cardText,
-        }}
+        underlineColorAndroid="transparent"
+        style={[
+          {
+            flex: 1,
+            fontFamily: fonts.semibold,
+            fontSize: 15,
+            color: dark ? colors.text : colors.cardText,
+            paddingVertical: 0,
+            backgroundColor: 'transparent',
+          },
+          noFocusRing,
+        ]}
       />
       {showClear && (
         <Pressable onPress={clear} hitSlop={8} style={{ padding: spacing.sm }}>

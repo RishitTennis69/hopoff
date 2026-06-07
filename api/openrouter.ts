@@ -1,8 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { applyCors } from './_cors';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (applyCors(req, res)) return;
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -12,7 +14,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'OPENROUTER_API_KEY not configured on server' });
   }
 
-  const { system, user, model = process.env.OPENROUTER_MODEL ?? 'google/gemini-2.0-flash-001', temperature = 0.35 } = req.body ?? {};
+  const { system, user, model = process.env.OPENROUTER_MODEL ?? 'google/gemini-2.5-flash', temperature = 0.35 } = req.body ?? {};
   if (!system || !user) {
     return res.status(400).json({ error: 'Missing system or user message' });
   }

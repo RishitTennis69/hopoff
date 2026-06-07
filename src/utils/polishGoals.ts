@@ -1,4 +1,5 @@
-const FILLERS = /^(um|uh|like|so|okay|well|i want to|i need to|i should|maybe|just)\s+/gi;
+const FILLERS =
+  /^(um|uh|like|so|okay|well|i want to|i need to|i should|maybe|just|kind of|sort of)\s+/gi;
 
 function capitalize(s: string) {
   const t = s.trim();
@@ -9,14 +10,14 @@ function capitalize(s: string) {
 function cleanPhrase(raw: string) {
   let s = raw.replace(FILLERS, '').trim();
   s = s.replace(/\s+/g, ' ');
-  if (s && !/[.!?]$/.test(s)) s += '.';
+  s = s.replace(/[.!?]+$/, '');
   return capitalize(s);
 }
 
 /** Turn a messy voice brain-dump into a short, scannable weekly goals list. */
 export function polishBrainDump(raw: string): string {
   const chunks = raw
-    .split(/[\n.!?]+/)
+    .split(/[\n,;]+|(?:\.\s+)/)
     .map((c) => cleanPhrase(c))
     .filter((c) => c.length > 3);
 

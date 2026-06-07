@@ -84,9 +84,11 @@ export async function searchYouTube(query: string, max = 12): Promise<YouTubeSea
         : { ok: true, items: searchVideos(q), fromFallback: true };
     } catch (e) {
       if (e instanceof ApiError) {
+        if (__DEV__) console.warn('[youtube] proxy error', e.message, e.code);
         return { ok: false, error: e.message, code: e.code };
       }
-      return { ok: false, error: 'Search unavailable. Check your connection.', code: 'network' };
+      if (__DEV__) console.warn('[youtube] network error', e);
+      return { ok: false, error: 'Could not reach the search API. Check your connection.', code: 'network' };
     }
   }
 

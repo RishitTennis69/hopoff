@@ -88,10 +88,12 @@ export function GoalsEditor({ minHeight = 220 }: { minHeight?: number }) {
     }
     setConnectingId(service.id);
     if (service.method === 'oauth') {
-      await connectNotion();
-    } else {
-      await openShortcut(service.id);
+      const ok = await connectNotion();
+      setConnectingId(null);
+      if (ok) toggleConnected(service.id);
+      return;
     }
+    await openShortcut(service.id);
     setConnectingId(null);
     toggleConnected(service.id);
   };
