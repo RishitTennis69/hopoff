@@ -14,8 +14,13 @@ The `/api` folder is ready to deploy. You only need accounts and env vars.
 
 1. Push this repo to GitHub (if not already).
 2. Go to [vercel.com/new](https://vercel.com/new) → Import the repo.
-3. Leave **Root Directory** as `.` (project root). Vercel auto-detects `/api/*` serverless routes.
-4. Under **Environment Variables**, add everything from `api/.env.example`:
+3. Leave **Root Directory** as `.` (project root).
+4. **Important — override the Expo preset:**
+   - Framework Preset: **Other**
+   - Build Command: **leave empty**
+   - Output Directory: **leave empty**
+   - (Or rely on `vercel.json` in the repo — it already disables the Expo web build.)
+5. Under **Environment Variables**, add everything from `api/.env.example`:
 
    ```
    OPENROUTER_API_KEY=
@@ -26,6 +31,16 @@ The `/api` folder is ready to deploy. You only need accounts and env vars.
    ```
 
 5. Deploy. Copy the production URL (e.g. `https://hopoff-api.vercel.app`).
+
+### 404?
+
+| URL | Expected |
+|-----|----------|
+| `https://YOUR-URL.vercel.app/` | **404** — no website, API only |
+| `https://YOUR-URL.vercel.app/api` | **200** JSON `{ ok: true, ... }` |
+| `https://YOUR-URL.vercel.app/api/openrouter` | **405** on GET, **500** on POST without env vars |
+
+If `/api` is also 404, redeploy with Framework = **Other** and empty build command (see step 4).
 
 ## 3. Wire the app
 
