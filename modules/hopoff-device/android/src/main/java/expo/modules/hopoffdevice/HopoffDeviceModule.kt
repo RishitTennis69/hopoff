@@ -29,7 +29,7 @@ class HopoffDeviceModule : Module() {
     Events("onLimitExceeded")
 
     OnCreate {
-      val ctx = appContext.reactContext ?: return@OnCreate
+      val ctx = appContext.reactContext ?: return@OnCreate Unit
       val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
           val appId = intent?.getStringExtra("appId") ?: return
@@ -101,7 +101,7 @@ class HopoffDeviceModule : Module() {
     }
 
     AsyncFunction("setMonitoredApps") { apps: List<Map<String, Any>> ->
-      val ctx = appContext.reactContext ?: return@AsyncFunction
+      val ctx = appContext.reactContext ?: return@AsyncFunction null
       val entries = apps.mapNotNull { map ->
         val appId = map["appId"] as? String ?: return@mapNotNull null
         val packageName = map["packageName"] as? String ?: return@mapNotNull null
@@ -117,12 +117,12 @@ class HopoffDeviceModule : Module() {
     }
 
     AsyncFunction("clearMonitoredApps") {
-      val ctx = appContext.reactContext ?: return@AsyncFunction
+      val ctx = appContext.reactContext ?: return@AsyncFunction null
       MonitoringStore.clear(ctx)
     }
 
     AsyncFunction("openUsageAccessSettings") {
-      val ctx = appContext.reactContext ?: return@AsyncFunction
+      val ctx = appContext.reactContext ?: return@AsyncFunction null
       val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).apply {
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
       }
@@ -130,7 +130,7 @@ class HopoffDeviceModule : Module() {
     }
 
     AsyncFunction("openAccessibilitySettings") {
-      val ctx = appContext.reactContext ?: return@AsyncFunction
+      val ctx = appContext.reactContext ?: return@AsyncFunction null
       val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
       }
