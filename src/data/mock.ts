@@ -143,7 +143,7 @@ export const WEEK_STATS: DayStat[] = [
   { day: 'Fri', hours: 3.9, softSpots: [{ appId: 'twitter', hours: 2.0 }, { appId: 'tiktok', hours: 1.9 }] },
 ];
 
-export type ConnectMethod = 'oauth' | 'shortcut';
+export type ConnectMethod = 'oauth' | 'shortcut' | 'intent';
 
 export type ConnectService = {
   id: string;
@@ -152,6 +152,7 @@ export type ConnectService = {
   method: ConnectMethod;
 };
 
+/** @deprecated Use getConnectServicesForPlatform() — list varies by OS. */
 export const CONNECT_SERVICES: ConnectService[] = [
   { id: 'notion', name: 'Notion', brand: 'notion', method: 'oauth' },
   { id: 'reminders', name: 'Reminders', brand: 'reminders', method: 'shortcut' },
@@ -197,7 +198,7 @@ export const ONBOARDING_QUESTIONS: OnboardingQuestion[] = [
     id: 'daily_estimate',
     type: 'dial',
     question: 'How much time do you lose to your phone each day?',
-    max: 10,
+    max: 7,
   },
   {
     id: 'priorities',

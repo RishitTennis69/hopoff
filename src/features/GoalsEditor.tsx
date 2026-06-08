@@ -5,11 +5,12 @@ import { AppIcon } from '@/components/AppIcon';
 import { AppText } from '@/components/AppText';
 import { GlassCard } from '@/components/GlassCard';
 import { PillButton } from '@/components/PillButton';
-import { CONNECT_SERVICES, type ConnectService } from '@/data/mock';
+import { getConnectServicesForPlatform } from '@/data/connectServices';
+import type { ConnectService } from '@/data/mock';
 import { useSpeechToText } from '@/hooks/useSpeechToText';
 import { useGoalsStore } from '@/store/goalsStore';
 import { polishGoalsWithAi } from '@/utils/ai';
-import { connectNotion, openShortcut } from '@/utils/connect';
+import { connectNotion, openGoogleTasks, openShortcut, syncGoalsFromNotion } from '@/utils/connect';
 import { colors, glass, fonts, radii, spacing } from '@/theme';
 
 function ConnectRow({
@@ -65,10 +66,11 @@ function ConnectRow({
 }
 
 function MicIcon({ active }: { active: boolean }) {
-  const c = active ? colors.text : colors.textMuted;
+  const c = active ? colors.bg : colors.textMuted;
+  const fill = active ? colors.bg : colors.text;
   return (
     <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-      <Rect x="9" y="3" width="6" height="11" rx="3" fill={c} />
+      <Rect x="9" y="3" width="6" height="11" rx="3" fill={fill} />
       <Path d="M6 11a6 6 0 0 0 12 0M12 17v4" stroke={c} strokeWidth={2} strokeLinecap="round" />
     </Svg>
   );
@@ -89,8 +91,18 @@ export function GoalsEditor({ minHeight = 220 }: { minHeight?: number }) {
     setConnectingId(service.id);
     if (service.method === 'oauth') {
       const ok = await connectNotion();
+      if (ok) {
+        toggleConnected(service.id);
+        const imported = await syncGoalsFromNotion();
+        if (imported) setGoals(imported);
+      }
       setConnectingId(null);
-      if (ok) toggleConnected(service.id);
+      return;
+    }
+    if (service.method === 'intent' && service.id === 'google_tasks') {
+      const opened = await openGoogleTasks();
+      setConnectingId(null);
+      if (opened) toggleConnected(service.id);
       return;
     }
     await openShortcut(service.id);
@@ -140,11 +152,11 @@ export function GoalsEditor({ minHeight = 220 }: { minHeight?: number }) {
       <View style={{ position: 'relative' }}>
         <View
           style={{
-            backgroundColor: glass.bg,
+            backgroundColor: listening ? 'rgba(255,255,255,0.06)' : glass.bg,
             borderRadius: radii.xl,
             borderWidth: 1,
-            borderColor: glass.border,
-            borderTopColor: glass.highlight,
+            borderColor: listening ? colors.text : glass.border,
+            borderTopColor: listening ? colors.text : glass.highlight,
             padding: spacing.lg,
             minHeight,
           }}
@@ -190,13 +202,18 @@ export function GoalsEditor({ minHeight = 220 }: { minHeight?: number }) {
         </View>
         <Pressable
           onPress={handleMic}
+          accessibilityLabel={listening ? 'Stop recording' : 'Start recording'}
           style={({ pressed, hovered }) => ({
             position: 'absolute',
             top: spacing.lg,
             right: spacing.lg,
             zIndex: 2,
             opacity: pressed ? 0.6 : hovered ? 0.85 : 1,
-            padding: 4,
+            padding: spacing.sm,
+            borderRadius: 999,
+            backgroundColor: listening ? colors.text : 'transparent',
+            borderWidth: listening ? 0 : 1,
+            borderColor: glass.border,
           })}
           hitSlop={10}
         >
@@ -204,13 +221,19 @@ export function GoalsEditor({ minHeight = 220 }: { minHeight?: number }) {
         </Pressable>
       </View>
 
+      {listening ? (
+        <AppText variant="caption" color={colors.textMuted} style={{ marginTop: spacing.sm }}>
+          Recording — tap mic again to stop
+        </AppText>
+      ) : null}
+
       {goalsText.trim().length > 0 && (
         <PillButton
           label="Polish my list"
           variant="dark"
           size="compact"
           loading={polishing}
-          style={{ marginTop: spacing.sm }}
+          style={{ marginTop: spacing.sm, borderColor: colors.text, borderWidth: 1 }}
           onPress={handlePolish}
         />
       )}
@@ -219,7 +242,7 @@ export function GoalsEditor({ minHeight = 220 }: { minHeight?: number }) {
         Pull in your goals
       </AppText>
       <View style={{ gap: spacing.md }}>
-        {CONNECT_SERVICES.map((s) => (
+        {getConnectServicesForPlatform().map((s) => (
           <ConnectRow
             key={s.id}
             service={s}

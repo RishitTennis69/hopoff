@@ -8,7 +8,8 @@ type VideoState = {
   lastImportCount: number;
   seeded: boolean;
   libraryCustomized: boolean;
-  addVideo: (v: VideoItem) => void;
+  addVideo: (v: VideoItem) => boolean;
+  updateVideo: (v: VideoItem) => void;
   removeVideo: (id: string) => void;
   addMany: (vids: VideoItem[]) => void;
   isAdded: (id: string) => boolean;
@@ -22,12 +23,16 @@ export const useVideoStore = create<VideoState>()(
       lastImportCount: 0,
       seeded: false,
       libraryCustomized: false,
-      addVideo: (v) =>
-        set((s) =>
-          s.added.some((x) => x.id === v.id)
-            ? {}
-            : { added: [...s.added, v], libraryCustomized: true },
-        ),
+      addVideo: (v) => {
+        const exists = get().added.some((x) => x.id === v.id);
+        if (exists) return false;
+        set((s) => ({ added: [...s.added, v], libraryCustomized: true }));
+        return true;
+      },
+      updateVideo: (v) =>
+        set((s) => ({
+          added: s.added.map((x) => (x.id === v.id ? { ...x, ...v } : x)),
+        })),
       removeVideo: (id) =>
         set((s) => ({ added: s.added.filter((v) => v.id !== id), libraryCustomized: true })),
       addMany: (vids) =>

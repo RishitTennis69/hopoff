@@ -39,9 +39,10 @@ After any `.env` change → **restart Expo**.
 
 ## 2. Before device testing (TestFlight / internal APK)
 
-You need a **development build** (not Expo Go) for share sheet, mic, and future native blocking.
+You need a **development build** (not Expo Go) for share sheet, mic, Notion OAuth, installed-app detection, and screen-time import.
 
-**Step-by-step:** [`docs/DEV-BUILD.md`](docs/DEV-BUILD.md)
+**Build guide:** [`docs/DEV-BUILD.md`](docs/DEV-BUILD.md)  
+**Time-gated / easy-to-miss tests:** [`docs/DEFERRED-TESTING.md`](docs/DEFERRED-TESTING.md) — trial expiry, overlay timing, week chart, iOS Shortcuts vs Android, etc.
 
 ```bash
 npm install -g eas-cli && eas login
@@ -50,45 +51,79 @@ eas build --profile development --platform ios   # or android
 npx expo start --dev-client
 ```
 
+**Rebuild required** after `hopoff-device` native module or `app.json` permission changes — Metro reload is not enough.
+
+### 2a. Build & environment
+
 | Task | Owner | Status |
 |------|-------|--------|
 | `eas build:configure` + link Expo account | **You** | [ ] |
-| `eas build --profile development` (iOS + Android) | **You** | [ ] |
-| `expo-dev-client` in project | **Dev** | [x] |
+| `eas build --profile development` (iOS + Android) | **You** | [ ] — rebuild after latest native changes |
+| `expo-dev-client` + `hopoff-device` module | **Dev** | [x] |
 | `eas.json` + [`docs/DEV-BUILD.md`](docs/DEV-BUILD.md) | **Dev** | [x] |
 | App display name → **HopOff** in `app.json` | **Dev** | [x] |
-| Test share sheet (TikTok / IG → HopOff) | **You** | [ ] |
-| Test mic + speech-to-text on goals | **You** | [ ] |
-| Test YouTube search in app | **You** | [ ] |
-| Test Notion Connect on device | **You** | [ ] |
-| Test Screen Time permission prompt (iOS) | **You** | [ ] |
+| Notion redirect `hoptfoff://notion-callback` in Notion console | **You** | [ ] verify (dev build — not Expo Go) |
+| Vercel redeploy after YouTube duration API change | **You** | [ ] if search timestamps missing |
+
+### 2b. Immediate device tests (same session)
+
+| Task | Owner | Status |
+|------|-------|--------|
+| Open app via **dev client** (not Expo Go) | **You** | [ ] |
+| Share sheet — TikTok / IG / YT → HopOff | **You** | [ ] |
+| Mic + speech-to-text on Goals (start/stop cue) | **You** | [ ] |
+| YouTube search — results ≤2 min + timestamps | **You** | [ ] |
+| Notion Connect on device | **You** | [ ] — if fail, read alert (Go vs dev URI / Vercel secret) |
+| **Block overlay — Preview block screen** (Home) | **You** | [ ] |
+| **Block overlay — Simulate limit hit** (Home, dev) | **You** | [ ] |
+| Apps tab — only **installed** apps listed | **You** | [ ] |
+| Apps — Select all, Create Group (full-width tap) | **You** | [ ] |
+| Group name input cursor centered | **You** | [ ] |
+| Onboarding ranking icons + drag (no bounce) | **You** | [ ] |
+| Videos grid — 2 columns when width allows | **You** | [ ] |
+| Tab titles centered (Home, Apps, Videos, Goals) | **You** | [ ] |
+
+### 2c. Permissions & platform-specific
+
+| Task | Owner | Status |
+|------|-------|--------|
+| iOS Screen Time / Android Accessibility prompt | **You** | [ ] |
+| Android **Usage access** (week chart import) | **You** | [ ] — Settings → Special app access → Usage access → HopOff |
+| Week chart fills from device (Android) | **You** | [ ] — see [`docs/BACKLOG.md`](docs/BACKLOG.md) |
+| iOS installed-app detection (URL schemes) | **You** | [ ] |
+| Polish my list (AI) | **You** | [ ] |
+| Dashboard hides “That's enough time” when usage is 0 | **You** | [ ] |
+
+### 2d. Goals integrations
+
+| Task | Owner | Platform | Status |
+|------|-------|----------|--------|
+| Notion OAuth | **You** | iOS + Android | [ ] |
+| Reminders Shortcut | **You** | **iOS only** — [`docs/ios-shortcuts.md`](docs/ios-shortcuts.md) | [ ] |
+| Notes Shortcut | **You** | **iOS only** | [ ] |
+| Set `EXPO_PUBLIC_SHORTCUT_*_URL` after publishing Shortcuts | **You** | iOS | [ ] |
+| Google Tasks Connect (opens app / Play Store) | **You** | Android | [ ] |
+| Reminders/Notes hidden on Android (iOS only) | **You** | Android | [ ] — expected |
+
+### 2e. Deferred — use later checklist
+
+Not visible on day one; full list in [`docs/DEFERRED-TESTING.md`](docs/DEFERRED-TESTING.md):
+
+| Task | Owner | Status |
+|------|-------|--------|
+| Overlay “waste my life” link (appears after **4 s**) | **You** | [ ] |
+| Settings pricing after **7-day trial** ends | **You** | [ ] — **Settings → Expire trial (test)** in dev |
+| Real limit → overlay (native blocking) | **You** + **Dev** | [ ] — §4 below |
+| RevenueCat restore + sandbox purchase | **You** | [ ] — §3 below |
+| Commit rate / reclaimed hours after overlay choices | **You** | [ ] |
 
 ---
 
 ## 3. Before App Store / Play submit
 
-| Task | Owner | Status |
-|------|-------|--------|
-| App Store Connect app + subscriptions ($9.99/mo, $59.99/yr, 7-day trial) | **You** | [ ] |
-| Google Play app + matching subscription products | **You** | [ ] |
-| RevenueCat project linked to both stores | **You** | [ ] |
-| `EXPO_PUBLIC_REVENUECAT_API_KEY` in EAS secrets | **You** | [ ] |
-| Product IDs match `EXPO_PUBLIC_RC_PRODUCT_*` in `.env` | **You** | [ ] |
-| Payments service + paywall + restore (Settings) | **Dev** | [x] |
-| Privacy policy hosted at public URL | **You** | [ ] — draft: [`legal/privacy-policy.md`](legal/privacy-policy.md) |
-| Terms of service hosted at public URL | **You** | [ ] — draft: [`legal/terms-of-service.md`](legal/terms-of-service.md) |
-| Subscription disclosure in store listing + paywall | **You** | [ ] — copy: [`docs/store-listing-draft.md`](docs/store-listing-draft.md) |
-| App icon + screenshots (5–6 per size) + optional preview video | **You** | [ ] |
-| Store description / subtitle / keywords | **You** | [ ] — draft: [`docs/store-listing-draft.md`](docs/store-listing-draft.md) |
-| Age rating questionnaire | **You** | [ ] |
-| Apple Privacy Nutrition Labels | **You** | [ ] |
-| Google Play Data Safety form | **You** | [ ] |
-| GDPR / CCPA review if applicable | **You** | [ ] |
-| Decide final slug (`hoptfoff` vs rename bundle ID) | **You** | [ ] |
-| `eas build --profile production` | **You** | [ ] |
-| `eas submit` iOS + Android | **You** | [ ] |
+**→ Full pre-submit checklist:** [`docs/APP-STORE.md`](docs/APP-STORE.md) (legal, store products, native gaps, QA, submit).
 
-**Store fees (unrelated to API usage):** Apple Developer **$99/yr**, Google Play **$25 one-time** — pay when you submit, not per user.
+**Store fees:** Apple Developer **$99/yr**, Google Play **$25 one-time** — pay when you submit, not per user.
 
 ---
 
@@ -104,13 +139,17 @@ npx expo start --dev-client
 
 ---
 
-## 5. iOS Shortcuts (optional for v1)
+## 5. iOS Shortcuts & Android goal import (optional for v1)
 
 | Task | Owner | Status |
 |------|-------|--------|
 | Build + publish Reminders + Notes Shortcuts | **You** | [ ] — [`docs/ios-shortcuts.md`](docs/ios-shortcuts.md) |
 | Set `EXPO_PUBLIC_SHORTCUT_*_URL` in `.env` | **You** | [ ] |
 | Shortcut URL env wiring in app | **Dev** | [x] |
+| Android: surface **Google Keep / Tasks** when installed (detect via package) | **Dev** | [ ] — see [`docs/DEFERRED-TESTING.md`](docs/DEFERRED-TESTING.md) §4 |
+| Hide or replace Reminders/Notes rows on Android | **Dev** | [ ] |
+
+**Platform note:** Reminders + Notes use **Apple Shortcuts** (iOS only). Android has no equivalent; **Notion** works on both. Keep/Tasks detection is planned using the same `hopoff-device` package checks as social apps.
 
 ---
 
@@ -168,8 +207,8 @@ Rough order-of-magnitude for **HopOff’s current stack**. Not legal/financial a
 
 **Done:** API keys, Vercel deploy, app `.env` wired.
 
-**Next:** restart Expo → test in app → EAS dev build on a real phone.
+**Next:** new EAS dev build (native module) → [`PRODUCTION.md`](PRODUCTION.md) §2 immediate tests → overlay preview → [`docs/DEFERRED-TESTING.md`](docs/DEFERRED-TESTING.md) for time-gated items.
 
 **Before submit:** stores + RevenueCat + host legal docs + screenshots.
 
-**After launch:** native blocking, Notion sync, push, account sync.
+**After launch:** native blocking, Notion sync, Android Keep/Tasks, push, account sync.

@@ -1,24 +1,69 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, View } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, Platform, Pressable, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { AppText } from '@/components/AppText';
-import { GlassCard } from '@/components/GlassCard';
+import { PillButton } from '@/components/PillButton';
 import { OnboardingScreen } from '@/features/OnboardingScreen';
 import { usePermissionsStore } from '@/store/permissionsStore';
 import {
-  finalizeScreenTimePermission,
-  getPermissionLabels,
-  requestAllHopOffPermissions,
+  openPermissionSettings,
+  requestMicAndSpeechAccess,
+  skipPermissionsForDev,
+  verifyPermissionStep,
+  type PermissionStepId,
 } from '@/services/permissions';
 import { colors, spacing } from '@/theme';
 
-const BULLETS = [
-  'Detect when you open a limited app',
-  'Surface your motivation at the right moment',
-  'Measure time saved — stored only on your device',
+const PRIVACY =
+  'HopOff uses on-device usage data to block limited apps and show your week chart. We never view your screen.';
+
+type SetupStep = {
+  id: PermissionStepId | 'mic';
+  label: string;
+  path: string;
+  openLabel: string;
+  settingsStep?: PermissionStepId;
+};
+
+const ANDROID_STEPS: SetupStep[] = [
+  {
+    id: 'accessibility',
+    label: 'Accessibility',
+    path: 'Settings → Accessibility → HopOff → On',
+    openLabel: 'Open Accessibility',
+    settingsStep: 'accessibility',
+  },
+  {
+    id: 'usage',
+    label: 'Usage access',
+    path: 'Settings → Usage access → HopOff → Allow',
+    openLabel: 'Open Usage access',
+    settingsStep: 'usage',
+  },
+  {
+    id: 'mic',
+    label: 'Microphone (optional)',
+    path: 'Tap Allow when prompted — for voice goals',
+    openLabel: 'Allow microphone',
+  },
+];
+
+const IOS_STEPS: SetupStep[] = [
+  {
+    id: 'screen_time',
+    label: 'Screen Time',
+    path: 'Settings → Screen Time → HopOff → Allow',
+    openLabel: 'Open Screen Time',
+    settingsStep: 'screen_time',
+  },
+  {
+    id: 'mic',
+    label: 'Microphone (optional)',
+    path: 'Tap Allow when prompted — for voice goals',
+    openLabel: 'Allow microphone',
+  },
 ];
 
 function ShieldIcon({ enabled }: { enabled: boolean }) {
@@ -46,17 +91,18 @@ function Check({ filled }: { filled: boolean }) {
   return (
     <View
       style={{
-        width: 22,
-        height: 22,
-        borderRadius: 11,
+        width: 24,
+        height: 24,
+        borderRadius: 12,
         borderWidth: filled ? 0 : 1.5,
         borderColor: colors.border,
         backgroundColor: filled ? colors.text : 'transparent',
         alignItems: 'center',
         justifyContent: 'center',
+        marginTop: 2,
       }}
     >
-      <Svg width={13} height={13} viewBox="0 0 24 24">
+      <Svg width={14} height={14} viewBox="0 0 24 24">
         <Path
           d="M20 6L9 17l-5-5"
           stroke={filled ? colors.bg : colors.textMuted}
@@ -72,129 +118,168 @@ function Check({ filled }: { filled: boolean }) {
 
 export default function OnboardingPermissions() {
   const router = useRouter();
-  const screenTimeAuthorized = usePermissionsStore((s) => s.screenTimeAuthorized);
   const micAuthorized = usePermissionsStore((s) => s.micAuthorized);
   const [busy, setBusy] = useState(false);
-  const [hint, setHint] = useState<string | null>(null);
-  const { screenTime: apiName } = getPermissionLabels();
-  const enabled = screenTimeAuthorized;
+  const [completed, setCompleted] = useState<Record<string, boolean>>({});
+  const [error, setError] = useState<string | null>(null);
+  const pendingVerify = useRef<PermissionStepId | null>(null);
+  const isAndroid = Platform.OS === 'android';
+  const steps = isAndroid ? ANDROID_STEPS : IOS_STEPS;
+
+  const currentStep = steps.find((s) => !completed[s.id]);
+  const allDone = steps.every((s) => completed[s.id]);
+
+  const tryCompleteStep = useCallback(async (stepId: PermissionStepId | 'mic') => {
+    if (stepId === 'mic') {
+      const ok = usePermissionsStore.getState().micAuthorized;
+      if (ok) {
+        setCompleted((c) => ({ ...c, mic: true }));
+        setError(null);
+      }
+      return;
+    }
+
+    const result = await verifyPermissionStep(stepId);
+    if (result.ok) {
+      setCompleted((c) => ({ ...c, [stepId]: true }));
+      pendingVerify.current = null;
+      setError(null);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else if (pendingVerify.current === stepId) {
+      setError(result.message ?? 'Not detected yet — finish in Settings, then return here.');
+    }
+  }, []);
 
   useEffect(() => {
     if (Platform.OS === 'web') {
       usePermissionsStore.getState().setScreenTimeAuthorized(true);
       usePermissionsStore.getState().setMicAuthorized(true);
+      setCompleted({ accessibility: true, usage: true, screen_time: true, mic: true });
     }
   }, []);
 
-  const onCta = async () => {
-    if (!enabled) {
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' || !pendingVerify.current) return;
+      void tryCompleteStep(pendingVerify.current);
+    });
+    return () => sub.remove();
+  }, [tryCompleteStep]);
+
+  const openCurrentStep = async () => {
+    if (!currentStep || busy) return;
+    setError(null);
+
+    if (currentStep.id === 'mic') {
       setBusy(true);
-      setHint(null);
-      const result = await requestAllHopOffPermissions();
+      await requestMicAndSpeechAccess();
+      setCompleted((c) => ({ ...c, mic: true }));
+      setError(null);
       setBusy(false);
-
-      if (result.screenTimeMessage) {
-        setHint(result.screenTimeMessage);
-      }
-
-      if (!result.screenTime) {
-        // User was sent to Settings — confirm on next tap after enabling.
-        setHint(
-          Platform.OS === 'ios'
-            ? 'Turn on Screen Time for HopOff in Settings, then tap Enable again to confirm.'
-            : 'Enable Accessibility for HopOff in Settings, then tap Enable again to confirm.',
-        );
-        return;
-      }
-
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       return;
     }
 
+    if (currentStep.settingsStep) {
+      pendingVerify.current = currentStep.id as PermissionStepId;
+      setBusy(true);
+      await openPermissionSettings(currentStep.settingsStep);
+      setBusy(false);
+    }
+  };
+
+  const onContinue = () => {
+    usePermissionsStore.getState().setScreenTimeAuthorized(true);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     router.push('/onboarding/paywall');
   };
 
-  const confirmAfterSettings = async () => {
+  const devBypass = async () => {
     setBusy(true);
-    const ok = await finalizeScreenTimePermission();
+    await skipPermissionsForDev();
     setBusy(false);
-    if (ok) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setHint(null);
-    }
+    router.push('/onboarding/paywall');
   };
+
+  const title = allDone
+    ? 'Permissions ready.'
+    : isAndroid
+      ? 'HopOff needs Android Settings access.'
+      : 'HopOff needs iPhone Settings access.';
+
+  const subtitle = allDone
+    ? 'Tap Continue to finish setup.'
+    : currentStep
+      ? `${PRIVACY}\n\n${currentStep.path}`
+      : PRIVACY;
+
+  const footer = busy ? (
+    <View style={{ alignItems: 'center', paddingVertical: spacing.md }}>
+      <ActivityIndicator color={colors.text} />
+    </View>
+  ) : allDone ? (
+    <PillButton label="Continue" onPress={onContinue} fullWidth />
+  ) : currentStep ? (
+    <PillButton label={currentStep.openLabel} onPress={openCurrentStep} fullWidth />
+  ) : null;
 
   return (
     <OnboardingScreen
       step={7}
-      title={enabled ? `${apiName} is on.` : `Enable ${apiName}.`}
-      subtitle={
-        enabled
-          ? 'You\u2019re all set. HopOff can now step in the moment you reach for a limited app.'
-          : `HopOff requires ${apiName} to enforce the limits you set. No data leaves your device.`
-      }
-      ctaLabel={enabled ? 'Continue' : busy ? 'Opening Settings…' : `Enable ${apiName}`}
-      onNext={hint && !enabled ? confirmAfterSettings : onCta}
+      title={title}
+      subtitle={subtitle}
+      onNext={() => {}}
       onBack={() => router.back()}
-      footer={
-        busy ? (
-          <View style={{ alignItems: 'center', paddingVertical: spacing.md }}>
-            <ActivityIndicator color={colors.text} />
-          </View>
-        ) : undefined
-      }
+      footer={footer}
     >
       <View style={{ alignItems: 'center', marginBottom: spacing.xl }}>
-        <ShieldIcon enabled={enabled} />
+        <ShieldIcon enabled={allDone} />
       </View>
 
-      {enabled && (
-        <Animated.View entering={FadeIn}>
-          <GlassCard
-            selected
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: spacing.md,
-              marginBottom: spacing.lg,
-            }}
-          >
-            <Check filled />
-            <AppText variant="subheading" color={colors.text} style={{ flex: 1 }}>
-              {apiName} connected
-            </AppText>
-          </GlassCard>
-        </Animated.View>
-      )}
+      <View style={{ gap: spacing.lg, marginBottom: spacing.lg }}>
+        {steps.map((step) => {
+          const done = completed[step.id];
+          const current = !allDone && step.id === currentStep?.id;
+          const textColor = done ? colors.textMuted : current ? colors.text : colors.textMuted;
 
-      <GlassCard style={{ gap: spacing.lg }}>
-        {BULLETS.map((b) => (
-          <View key={b} style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
-            <Check filled={enabled} />
-            <AppText variant="body" color={colors.text} style={{ flex: 1 }}>
-              {b}
-            </AppText>
-          </View>
-        ))}
-        {micAuthorized && (
-          <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
-            <Check filled />
-            <AppText variant="body" color={colors.text} style={{ flex: 1 }}>
-              Microphone ready for voice goals
-            </AppText>
-          </View>
-        )}
-      </GlassCard>
+          return (
+            <View key={step.id} style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
+              <Check filled={done} />
+              <AppText variant="body" color={textColor} style={{ flex: 1 }}>
+                {step.label}
+              </AppText>
+            </View>
+          );
+        })}
+      </View>
 
-      {hint ? (
-        <AppText variant="small" color={colors.textMuted} center style={{ marginTop: spacing.lg }}>
-          {hint}
+      {micAuthorized && completed.mic ? (
+        <AppText variant="small" color={colors.textFaint} style={{ marginBottom: spacing.md }}>
+          Microphone ready.
         </AppText>
       ) : null}
 
-      <AppText variant="small" color={colors.textFaint} center style={{ marginTop: spacing.lg }}>
-        Access is used only to block and unblock apps. We never view your screen or personal data.
-      </AppText>
+      {error ? (
+        <AppText variant="small" color={colors.textMuted} style={{ marginBottom: spacing.md }}>
+          {error}
+        </AppText>
+      ) : null}
+
+      {__DEV__ && !allDone ? (
+        <Pressable
+          onPress={devBypass}
+          style={({ pressed }) => ({
+            marginTop: spacing.md,
+            paddingVertical: spacing.md,
+            alignItems: 'center',
+            opacity: pressed ? 0.7 : 1,
+          })}
+        >
+          <AppText variant="small" color={colors.textFaint}>
+            Skip permissions (dev testing)
+          </AppText>
+        </Pressable>
+      ) : null}
     </OnboardingScreen>
   );
 }

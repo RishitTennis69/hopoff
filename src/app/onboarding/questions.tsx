@@ -111,8 +111,8 @@ export default function OnboardingQuestions() {
         )}
         {q.type === 'rank' && (
           <>
-            <AppText variant="small" color={colors.textMuted} center style={{ marginBottom: spacing.md }}>
-              Drag to rank — #1 is your top priority
+            <AppText variant="small" color={colors.text} center style={{ marginBottom: spacing.md, opacity: 0.85 }}>
+              Tap one item, then tap another to swap — #1 is your top priority
             </AppText>
             <RankingList
             items={q.options}

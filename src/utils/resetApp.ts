@@ -26,7 +26,12 @@ export async function resetApp() {
   useOnboardingStore.getState().reset();
   useGoalsStore.setState({ goalsText: '', connected: [], notionAccessToken: null });
   useVideoStore.setState({ added: [], lastImportCount: 0, seeded: false, libraryCustomized: false });
-  useAppsStore.setState({ checkedIds: [], groups: [], draftAppIds: [] });
+  useAppsStore.setState({
+    checkedIds: [],
+    groups: [],
+    draftAppIds: [],
+    installedAppIds: useAppsStore.getState().installedAppIds,
+  });
   useStatsStore.setState({ commitCount: 0, wasteCount: 0 });
   useUsageStore.setState({ byDay: {}, reclaimedMinutes: 0 });
   usePermissionsStore.getState().reset();

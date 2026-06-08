@@ -1,6 +1,7 @@
-import { Linking, Modal, Pressable, View } from 'react-native';
+import { Image, Linking, Modal, Pressable, ScrollView, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { AppIcon } from './AppIcon';
 import { AppText } from './AppText';
 import { MotivationVideo } from './MotivationVideo';
 import { PillButton } from './PillButton';
@@ -17,19 +18,6 @@ function CloseButton({ onClose }: { onClose: () => void }) {
         <Path d="M6 6l12 12M18 6L6 18" stroke={colors.text} strokeWidth={2.5} strokeLinecap="round" />
       </Svg>
     </Pressable>
-  );
-}
-
-function Caption({ video }: { video: VideoItem }) {
-  return (
-    <>
-      <AppText variant="subheading" center style={{ marginTop: spacing.lg, paddingHorizontal: spacing.xl }}>
-        {video.title}
-      </AppText>
-      <AppText variant="small" color={colors.textMuted} center style={{ marginTop: spacing.xs }}>
-        {video.author}
-      </AppText>
-    </>
   );
 }
 
@@ -52,24 +40,59 @@ function Mp4Player({ video }: { video: VideoItem }) {
   );
 }
 
+function LinkPreview({ video }: { video: VideoItem }) {
+  return (
+    <View style={{ marginHorizontal: spacing.xl, alignItems: 'center', gap: spacing.md }}>
+      <View
+        style={{
+          width: '100%',
+          aspectRatio: 9 / 16,
+          maxHeight: 360,
+          borderRadius: radii.lg,
+          overflow: 'hidden',
+          backgroundColor: video.accent,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {video.thumbnailUrl ? (
+          <Image
+            source={{ uri: video.thumbnailUrl }}
+            style={{ width: '100%', height: '100%' }}
+            resizeMode="cover"
+          />
+        ) : (
+          <AppIcon brandKey={video.source} size={72} />
+        )}
+      </View>
+      <AppText variant="subheading" center style={{ paddingHorizontal: spacing.md }}>
+        {video.title}
+      </AppText>
+      {video.author && video.author !== video.title ? (
+        <AppText variant="caption" color={colors.textMuted} center>
+          {video.author}
+        </AppText>
+      ) : null}
+      <PillButton
+        label={`Watch on ${video.source === 'instagram' ? 'Instagram' : video.source === 'tiktok' ? 'TikTok' : video.author}`}
+        onPress={() => Linking.openURL(video.videoUrl)}
+        fullWidth
+      />
+    </View>
+  );
+}
+
 function Body({ video }: { video: VideoItem }) {
   if (video.kind === 'youtube' && video.youtubeId) {
     return (
       <View style={{ marginHorizontal: spacing.xl }}>
-        <MotivationVideo youtubeId={video.youtubeId} style={{ maxHeight: 520, alignSelf: 'center' }} />
+        <MotivationVideo youtubeId={video.youtubeId} muted={false} loop={false} style={{ maxHeight: 520, alignSelf: 'center' }} />
       </View>
     );
   }
 
   if (video.kind === 'link') {
-    return (
-      <View style={{ marginHorizontal: spacing.xl, alignItems: 'center', gap: spacing.lg }}>
-        <AppText variant="bodyRegular" color={colors.textMuted} center>
-          This clip lives on {video.author}. Open it there to watch.
-        </AppText>
-        <PillButton label={`Open in ${video.author}`} onPress={() => Linking.openURL(video.videoUrl)} />
-      </View>
-    );
+    return <LinkPreview video={video} />;
   }
 
   return <Mp4Player video={video} />;
@@ -81,13 +104,29 @@ type Props = {
 };
 
 export function VideoPlayerModal({ video, onClose }: Props) {
+  const showCaption = video && video.kind !== 'link';
+
   return (
     <Modal visible={!!video} animationType="fade" transparent onRequestClose={onClose}>
       {video ? (
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center' }}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)' }}>
           <CloseButton onClose={onClose} />
-          <Body video={video} />
-          <Caption video={video} />
+          <ScrollView
+            contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingVertical: spacing.xxxl }}
+            showsVerticalScrollIndicator={false}
+          >
+            <Body video={video} />
+            {showCaption ? (
+              <>
+                <AppText variant="subheading" center style={{ marginTop: spacing.lg, paddingHorizontal: spacing.xl }}>
+                  {video.title}
+                </AppText>
+                <AppText variant="small" color={colors.textMuted} center style={{ marginTop: spacing.xs }}>
+                  {video.author}
+                </AppText>
+              </>
+            ) : null}
+          </ScrollView>
         </View>
       ) : null}
     </Modal>

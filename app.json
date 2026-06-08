@@ -8,14 +8,25 @@
     "scheme": "hoptfoff",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "bundleIdentifier": "com.kgrogerrr.hopoff",
       "icon": "./assets/expo.icon",
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "HopOff uses the microphone to transcribe your weekly goals.",
-        "NSSpeechRecognitionUsageDescription": "HopOff transcribes your spoken goals into a weekly list.",
-        "NSFamilyControlsUsageDescription": "HopOff uses Screen Time to enforce the app limits you set."
+        "NSMicrophoneUsageDescription": "Allow HopOff to use the microphone for voice input.",
+        "NSSpeechRecognitionUsageDescription": "Allow HopOff to transcribe your weekly goals.",
+        "NSFamilyControlsUsageDescription": "HopOff uses Screen Time to enforce the app limits you set.",
+        "LSApplicationQueriesSchemes": [
+          "twitter",
+          "tiktok",
+          "youtube",
+          "instagram",
+          "snapchat",
+          "reddit",
+          "fb"
+        ]
       }
     },
     "android": {
+      "package": "com.kgrogerrr.hopoff",
       "adaptiveIcon": {
         "backgroundColor": "#000000",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -24,7 +35,8 @@
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.PACKAGE_USAGE_STATS"
       ]
     },
     "web": {
@@ -59,13 +71,22 @@
             "NSExtensionActivationSupportsWebURLWithMaxCount": 1,
             "NSExtensionActivationSupportsTextWithMaxCount": 1
           },
-          "androidIntentFilters": ["text/*"]
+          "iosAppGroupIdentifier": "group.com.kgrogerrr.hopoff",
+          "androidIntentFilters": [
+            "text/*"
+          ]
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "c3482638-8fee-44df-b63a-c0245700e49a"
+      }
     }
   }
 }

@@ -13,6 +13,8 @@ type UsageState = {
   /** Total reclaimed minutes from successful interventions */
   reclaimedMinutes: number;
   addUsage: (appId: string, minutes: number, date?: Date) => void;
+  /** Replace device-reported minutes for specific days (screen time import). */
+  importFromDevice: (entries: { appId: string; minutes: number; dateKey: DayKey }[]) => void;
   addReclaimed: (minutes: number) => void;
   getWeekStats: () => DayStat[];
   getWeekHours: () => number;
@@ -57,6 +59,15 @@ export function computeAllTimeHours(reclaimedMinutes: number): number {
   return Math.round((reclaimedMinutes / 60) * 10) / 10;
 }
 
+/** Total hours spent on limited apps (all recorded days). */
+export function computeAllTimeWastedHours(byDay: Record<DayKey, Record<string, number>>): number {
+  const totalMin = Object.values(byDay).reduce(
+    (sum, day) => sum + Object.values(day).reduce((a, m) => a + m, 0),
+    0,
+  );
+  return Math.round((totalMin / 60) * 10) / 10;
+}
+
 export function computeDailyAvgMinutes(byDay: Record<DayKey, Record<string, number>>): number {
   const keys = Object.keys(byDay);
   if (!keys.length) return 0;
@@ -80,6 +91,20 @@ export const useUsageStore = create<UsageState>()(
           const day = { ...(s.byDay[key] ?? {}) };
           day[appId] = (day[appId] ?? 0) + minutes;
           return { byDay: { ...s.byDay, [key]: day } };
+        });
+      },
+
+      importFromDevice: (entries) => {
+        if (!entries.length) return;
+        set((s) => {
+          const byDay = { ...s.byDay };
+          for (const { appId, minutes, dateKey } of entries) {
+            if (minutes <= 0) continue;
+            const day = { ...(byDay[dateKey] ?? {}) };
+            day[appId] = minutes;
+            byDay[dateKey] = day;
+          }
+          return { byDay };
         });
       },
 

@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="accessibility_service_description">HopOff uses Accessibility to detect when a limited app is opened and show your motivation overlay when daily limits are reached.</string>
+</resources>

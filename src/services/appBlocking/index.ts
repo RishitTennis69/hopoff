@@ -1,13 +1,51 @@
 import { Linking, Platform } from 'react-native';
 import { usePermissionsStore } from '@/store/permissionsStore';
+import {
+  hasUsageAccess,
+  openAccessibilitySettings,
+  openUsageAccessSettings,
+  syncDeviceData,
+} from '@/services/deviceUsage';
 import { nativeAppBlocking } from './native';
 import type { AppBlockingProvider, AuthorizationResult, MonitoredApp } from './types';
 
 export type { MonitoredApp, AuthorizationResult };
 
-/** Dev/prod entry — swaps to native module when linked. */
 function provider(): AppBlockingProvider {
   return nativeAppBlocking;
+}
+
+/** Open the OS screen the user needs right now. */
+export async function openPermissionSettings(step: 'accessibility' | 'usage' | 'screen_time'): Promise<void> {
+  try {
+    if (Platform.OS === 'android') {
+      if (step === 'usage') {
+        await openUsageAccessSettings();
+        return;
+      }
+      await openAccessibilitySettings();
+      return;
+    }
+    if (step === 'screen_time') {
+      const urls = ['App-Prefs:SCREEN_TIME', 'app-prefs:SCREEN_TIME', 'prefs:root=SCREEN_TIME'];
+      for (const url of urls) {
+        try {
+          const can = await Linking.canOpenURL(url);
+          if (can) {
+            await Linking.openURL(url);
+            return;
+          }
+        } catch {
+          /* try next */
+        }
+      }
+      await Linking.openSettings();
+      return;
+    }
+    await Linking.openSettings();
+  } catch {
+    await Linking.openSettings();
+  }
 }
 
 export async function requestScreenTimeAccess(): Promise<AuthorizationResult> {
@@ -15,34 +53,48 @@ export async function requestScreenTimeAccess(): Promise<AuthorizationResult> {
 
   if (result.granted) {
     usePermissionsStore.getState().setScreenTimeAuthorized(true);
+    await afterScreenTimeGranted();
     return result;
   }
 
-  // Interim: deep-link to OS settings so the user can enable access manually.
   if (result.needsSettings) {
-    try {
-      if (Platform.OS === 'ios') {
-        await Linking.openURL('App-Prefs:SCREEN_TIME').catch(() => Linking.openSettings());
-      } else {
-        await Linking.openSettings();
-      }
-    } catch {
-      await Linking.openSettings();
-    }
+    await openPermissionSettings(Platform.OS === 'android' ? 'accessibility' : 'screen_time');
   }
 
   return result;
 }
 
-export async function confirmScreenTimeAccess(): Promise<boolean> {
-  const authorized = await provider().isAuthorized();
-  if (authorized) {
-    usePermissionsStore.getState().setScreenTimeAuthorized(true);
-    return true;
+async function afterScreenTimeGranted(): Promise<void> {
+  if (Platform.OS === 'android') {
+    const usageOk = await hasUsageAccess();
+    if (!usageOk) {
+      await openUsageAccessSettings();
+    }
   }
-  // Dev builds without native module: user confirms after visiting Settings.
-  usePermissionsStore.getState().setScreenTimeAuthorized(true);
-  return true;
+  await syncDeviceData(7);
+}
+
+export async function confirmScreenTimeAccess(): Promise<boolean> {
+  try {
+    const authorized = await provider().isAuthorized();
+    if (authorized) {
+      usePermissionsStore.getState().setScreenTimeAuthorized(true);
+      await afterScreenTimeGranted();
+      return true;
+    }
+
+    if (Platform.OS === 'android') {
+      const usageOk = await hasUsageAccess();
+      if (!usageOk) return false;
+      await syncDeviceData(7);
+      usePermissionsStore.getState().setScreenTimeAuthorized(true);
+      return true;
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 export async function isScreenTimeAuthorized(): Promise<boolean> {

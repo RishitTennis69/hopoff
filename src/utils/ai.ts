@@ -92,18 +92,28 @@ Rules:
 
 type InsightPayload = { bullets: string[]; summary?: string };
 
-/** Natural "that's enough time to" lines whose hours add up. Falls back to local rules. */
+/** Natural "that's enough time to" lines — hours = time wasted on limited apps. */
 export async function buildTimeInsightsWithAi(
   goalsText: string,
-  availableHours: number,
+  wastedHours: number,
 ): Promise<string[]> {
-  const fallback = buildTimeInsights(goalsText, availableHours);
+  const fallback = buildTimeInsights(goalsText, wastedHours);
   const goals = goalsText.trim();
   if (!goals) return fallback;
 
   const raw = await chat(
-    `You write motivating copy for a screen-time app. Given reclaimed hours and the user's weekly goals, return ONLY valid JSON: {"bullets":["..."],"summary":"..."}. Rules: bullets are 2–4 natural sentences tying each goal to a realistic time chunk; assigned hours across bullets must sum to at most ${availableHours}; estimate how long each goal typically takes (e.g. calligraphy ~2 hrs); no repeated "you had X hours to spare" on every line; summary is one short line totaling the hours (e.g. "That's 5 hours of your 12 reclaimed").`,
-    `Reclaimed hours: ${availableHours}\nGoals:\n${goals}`,
+    `You write short dashboard copy for a screen-time reduction app. Return ONLY valid JSON: {"bullets":["..."]}.
+
+Context: The user WASTED this many hours on limited apps (scrolling, etc.) — NOT time they saved or reclaimed.
+
+Rules:
+- 2–3 bullets max, each under 12 words
+- Frame as what they could have done with that wasted time instead (tie to their goals)
+- Never say reclaimed, saved, earned, or recovered time
+- Never praise wasting less — this is time already lost to their phone
+- No summary line, no "you had X hours", no checkmarks language
+- Plain sentence case, scannable`,
+    `Hours wasted on limited apps this week: ${wastedHours}\nUser goals:\n${goals}`,
   );
 
   if (!raw) return fallback;
@@ -113,10 +123,8 @@ export async function buildTimeInsightsWithAi(
     const jsonEnd = raw.lastIndexOf('}');
     if (jsonStart < 0 || jsonEnd < 0) return fallback;
     const parsed = JSON.parse(raw.slice(jsonStart, jsonEnd + 1)) as InsightPayload;
-    const bullets = (parsed.bullets ?? []).filter(Boolean).slice(0, 4);
-    if (!bullets.length) return fallback;
-    if (parsed.summary?.trim()) bullets.push(parsed.summary.trim());
-    return bullets;
+    const bullets = (parsed.bullets ?? []).filter(Boolean).slice(0, 3);
+    return bullets.length ? bullets : fallback;
   } catch {
     return fallback;
   }

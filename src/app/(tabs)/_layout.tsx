@@ -1,9 +1,15 @@
 import { Tabs } from 'expo-router';
 import { TabIcon } from '@/components/TabIcon';
+import { TrialPaywallModal } from '@/components/TrialPaywallModal';
+import { useSubscriptionStore } from '@/store/subscriptionStore';
 import { fonts, colors } from '@/theme';
 
 export default function TabsLayout() {
+  const mustSubscribe = useSubscriptionStore((s) => s.mustSubscribe());
+
   return (
+    <>
+      <TrialPaywallModal visible={mustSubscribe} />
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -48,5 +54,6 @@ export default function TabsLayout() {
         }}
       />
     </Tabs>
+    </>
   );
 }

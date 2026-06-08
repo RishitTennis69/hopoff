@@ -7,6 +7,6 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   return res.status(200).json({
     ok: true,
     service: 'hopoff-api',
-    routes: ['/api/openrouter', '/api/youtube/search', '/api/notion/token'],
+    routes: ['/api/openrouter', '/api/youtube/search', '/api/notion/token', '/api/oembed'],
   });
 }

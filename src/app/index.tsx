@@ -31,7 +31,7 @@ export default function WelcomeScreen() {
         <AppText variant="small">HopOff</AppText>
       </View>
       <ScreenTitle center style={{ marginTop: spacing.xs }}>
-        Stop scrolling. Start living.
+        {'Stop scrolling.\nStart living.'}
       </ScreenTitle>
 
       <View style={{ flex: 1, justifyContent: 'center', marginTop: spacing.md, marginBottom: spacing.md }}>

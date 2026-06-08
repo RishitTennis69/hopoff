@@ -10,8 +10,15 @@ type SubscriptionState = {
   trialStartedAt: string | null;
   expiresAt: string | null;
   setFromPurchase: (planId: 'monthly' | 'annual', trialDays?: number) => void;
+  activateSubscription: (planId: 'monthly' | 'annual') => void;
   setStatus: (status: SubscriptionStatus, expiresAt?: string | null) => void;
   isPremium: () => boolean;
+  /** True when the free week ended and user has not subscribed. */
+  isTrialExpired: () => boolean;
+  /** Trial ended and user must subscribe — blocks the app behind the paywall. */
+  mustSubscribe: () => boolean;
+  /** Dev only — backdate trial so the post-trial popup appears. */
+  expireTrialForTesting: () => void;
   reset: () => void;
 };
 
@@ -22,7 +29,6 @@ export const useSubscriptionStore = create<SubscriptionState>()(
       planId: null,
       trialStartedAt: null,
       expiresAt: null,
-
       setFromPurchase: (planId, trialDays = 7) => {
         const now = new Date();
         const expires = new Date(now);
@@ -35,6 +41,14 @@ export const useSubscriptionStore = create<SubscriptionState>()(
         });
       },
 
+      activateSubscription: (planId) =>
+        set({
+          status: 'active',
+          planId,
+          trialStartedAt: null,
+          expiresAt: null,
+        }),
+
       setStatus: (status, expiresAt = null) => set({ status, expiresAt }),
 
       isPremium: () => {
@@ -46,8 +60,33 @@ export const useSubscriptionStore = create<SubscriptionState>()(
         return false;
       },
 
+      isTrialExpired: () => {
+        const { status, expiresAt } = get();
+        if (status === 'expired') return true;
+        if (status === 'trial' && expiresAt && new Date(expiresAt) < new Date()) return true;
+        return false;
+      },
+
+      mustSubscribe: () => get().isTrialExpired() && !get().isPremium(),
+
+      expireTrialForTesting: () => {
+        const past = new Date();
+        past.setDate(past.getDate() - 1);
+        set({
+          status: 'trial',
+          planId: 'annual',
+          trialStartedAt: past.toISOString(),
+          expiresAt: past.toISOString(),
+        });
+      },
+
       reset: () =>
-        set({ status: 'none', planId: null, trialStartedAt: null, expiresAt: null }),
+        set({
+          status: 'none',
+          planId: null,
+          trialStartedAt: null,
+          expiresAt: null,
+        }),
     }),
     { name: 'hopoff-subscription', storage: zustandStorage },
   ),

@@ -27,7 +27,6 @@ type Props = {
 
 function ProgressDots({
   step,
-  onBack,
   onGoToStep,
 }: {
   step: number;
@@ -35,13 +34,12 @@ function ProgressDots({
   onGoToStep?: (step: number) => void;
 }) {
   return (
-    <View style={{ flexDirection: 'row', gap: 6, justifyContent: 'center', marginBottom: spacing.lg }}>
+    <View style={{ flexDirection: 'row', gap: 6, justifyContent: 'center' }}>
       {Array.from({ length: ONBOARDING_TOTAL_STEPS }).map((_, i) => {
         const done = i < step - 1;
         const current = i === step - 1;
         const goBack = () => {
           if (onGoToStep) onGoToStep(i + 1);
-          else onBack?.();
         };
         return (
           <Pressable
@@ -89,20 +87,24 @@ export function OnboardingScreen({
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={{ flex: 1, paddingHorizontal: spacing.xl, paddingTop: spacing.md }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.sm,
+            marginBottom: spacing.xl,
+          }}
+        >
           {showBack ? (
-            <Pressable onPress={onBack} hitSlop={12} style={{ padding: spacing.xs, marginRight: spacing.sm }}>
+            <Pressable onPress={onBack} hitSlop={12} style={{ padding: spacing.xs }}>
               <Svg width={22} height={22} viewBox="0 0 24 24">
                 <Path d="M15 6l-6 6 6 6" stroke={colors.text} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" fill="none" />
               </Svg>
             </Pressable>
-          ) : (
-            <View style={{ width: 30 }} />
-          )}
+          ) : null}
           <View style={{ flex: 1 }}>
             <ProgressDots step={step} onBack={onBack} onGoToStep={onGoToStep} />
           </View>
-          <View style={{ width: 30 }} />
         </View>
         <ScrollView
           showsVerticalScrollIndicator={false}

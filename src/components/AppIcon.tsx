@@ -82,6 +82,20 @@ function Glyph({ brandKey, size, color, tight }: { brandKey: BrandKey; size: num
           />
         </Svg>
       );
+    case 'googleTasks':
+      return (
+        <Svg width={s} height={s} viewBox="0 0 24 24">
+          <Circle cx="12" cy="12" r="9" stroke={color} strokeWidth={2} fill="none" />
+          <Path
+            d="M8 12l2.5 2.5L16 9"
+            stroke={color}
+            strokeWidth={2.2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
+        </Svg>
+      );
     default:
       return null;
   }

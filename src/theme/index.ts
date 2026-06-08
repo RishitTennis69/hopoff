@@ -80,6 +80,7 @@ export const brand = {
   notes: { bg: '#FECE4E', fg: '#000000' },
   reminders: { bg: '#FFFFFF', fg: '#FF3B30' },
   notion: { bg: '#FFFFFF', fg: '#000000' },
+  googleTasks: { bg: '#1A73E8', fg: '#FFFFFF' },
 } as const;
 
 export type ThemeColors = typeof colors;

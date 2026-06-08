@@ -7,7 +7,8 @@ import { GlassCard } from '@/components/GlassCard';
 import { OnboardingScreen } from '@/features/OnboardingScreen';
 import { startFreeWeek } from '@/services/payments';
 import { useOnboardingStore } from '@/store/onboardingStore';
-import { colors, glass, spacing } from '@/theme';
+import { SubscriptionTerms } from '@/components/SubscriptionTerms';
+import { colors, spacing } from '@/theme';
 
 const PREMIUM = [
   { icon: 'block', label: 'Block any app, any time' },
@@ -16,11 +17,6 @@ const PREMIUM = [
   { icon: 'goal', label: 'AI-powered goal coaching' },
   { icon: 'share', label: 'Save from TikTok & Instagram' },
 ];
-
-const PLANS = [
-  { name: 'Monthly', price: '$9.99', cadence: '/month' },
-  { name: 'Annual', price: '$59.99', cadence: '/year', note: '$5 per month', highlight: 'Best value' },
-] as const;
 
 function FeatureIcon({ name }: { name: string }) {
   const c = colors.textMuted;
@@ -59,57 +55,6 @@ function FeatureIcon({ name }: { name: string }) {
     default:
       return null;
   }
-}
-
-function PlanInfo({ plan }: { plan: (typeof PLANS)[number] }) {
-  return (
-    <GlassCard
-      padded={false}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: spacing.md,
-        paddingHorizontal: spacing.md,
-        gap: spacing.md,
-      }}
-    >
-      <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-          <AppText variant="subheading" color={colors.text}>
-            {plan.name}
-          </AppText>
-          {'highlight' in plan && plan.highlight ? (
-            <View
-              style={{
-                borderWidth: 1,
-                borderColor: glass.border,
-                borderRadius: 999,
-                paddingHorizontal: spacing.sm,
-                paddingVertical: 2,
-              }}
-            >
-              <AppText variant="caption" color={colors.textMuted}>
-                {plan.highlight}
-              </AppText>
-            </View>
-          ) : null}
-        </View>
-        {'note' in plan && plan.note ? (
-          <AppText variant="caption" color={colors.textMuted}>
-            {plan.note}
-          </AppText>
-        ) : null}
-      </View>
-      <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-        <AppText variant="subheading" color={colors.text}>
-          {plan.price}
-        </AppText>
-        <AppText variant="caption" color={colors.textMuted}>
-          {plan.cadence}
-        </AppText>
-      </View>
-    </GlassCard>
-  );
 }
 
 export default function OnboardingPaywall() {
@@ -154,16 +99,7 @@ export default function OnboardingPaywall() {
           </View>
         ))}
       </GlassCard>
-
-      <AppText variant="subheading" color={colors.text} style={{ marginBottom: spacing.md }}>
-        If you are enjoying HopOff
-      </AppText>
-
-      <View style={{ gap: spacing.md }}>
-        {PLANS.map((p) => (
-          <PlanInfo key={p.name} plan={p} />
-        ))}
-      </View>
+      <SubscriptionTerms compact />
     </OnboardingScreen>
   );
 }

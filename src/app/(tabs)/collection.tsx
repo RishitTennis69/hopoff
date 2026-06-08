@@ -6,7 +6,7 @@ import { spacing } from '@/theme';
 export default function CollectionTab() {
   return (
     <Screen scroll edges={['top']}>
-      <ScreenTitle style={{ marginBottom: spacing.xl }}>
+      <ScreenTitle center style={{ marginBottom: spacing.xl }}>
         What motivates you?
       </ScreenTitle>
       <CollectionManager />

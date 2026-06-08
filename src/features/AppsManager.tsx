@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { AppText } from '@/components/AppText';
 import { GroupCard } from '@/components/GroupCard';
@@ -11,20 +11,41 @@ import { colors, spacing } from '@/theme';
 
 export function AppsManager({ editableGroups = false }: { editableGroups?: boolean }) {
   const router = useRouter();
-  const { checkedIds, groups, toggleChecked, beginGroupFromChecked } = useAppsStore();
+  const {
+    checkedIds,
+    groups,
+    installedAppIds,
+    toggleChecked,
+    selectAllUngrouped,
+    clearChecked,
+    beginGroupFromChecked,
+  } = useAppsStore();
 
   const groupedIds = useMemo(() => groups.flatMap((g) => g.appIds), [groups]);
+  const installedSet = useMemo(() => new Set(installedAppIds), [installedAppIds]);
+
+  const catalog = useMemo(
+    () => APP_CATALOG.filter((a) => installedSet.has(a.id)),
+    [installedSet],
+  );
 
   const ungrouped = useMemo(
-    () => APP_CATALOG.filter((a) => !groupedIds.includes(a.id)),
-    [groupedIds],
+    () => catalog.filter((a) => !groupedIds.includes(a.id)),
+    [catalog, groupedIds],
   );
 
   const canGroup = checkedIds.length >= 2;
+  const allUngroupedSelected =
+    ungrouped.length > 0 && ungrouped.every((a) => checkedIds.includes(a.id));
 
   const createGroup = () => {
     beginGroupFromChecked();
     router.push('/group-modal');
+  };
+
+  const toggleSelectAll = () => {
+    if (allUngroupedSelected) clearChecked();
+    else selectAllUngrouped();
   };
 
   return (
@@ -33,6 +54,7 @@ export function AppsManager({ editableGroups = false }: { editableGroups?: boole
         label="Create Group"
         variant="dark"
         disabled={!canGroup}
+        fullWidth
         onPress={createGroup}
       />
       {groups.length === 0 && (
@@ -61,9 +83,25 @@ export function AppsManager({ editableGroups = false }: { editableGroups?: boole
       )}
 
       <View style={{ gap: spacing.sm }}>
-        <AppText variant="caption" color={colors.textMuted} style={{ paddingHorizontal: spacing.xs }}>
-          Apps
-        </AppText>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: spacing.xs,
+          }}
+        >
+          <AppText variant="caption" color={colors.textMuted}>
+            Apps
+          </AppText>
+          {ungrouped.length > 0 ? (
+            <Pressable onPress={toggleSelectAll} hitSlop={8}>
+              <AppText variant="caption" color={colors.text}>
+                {allUngroupedSelected ? 'Deselect all' : 'Select all'}
+              </AppText>
+            </Pressable>
+          ) : null}
+        </View>
         {ungrouped.map((app) => (
           <SelectRow
             key={app.id}

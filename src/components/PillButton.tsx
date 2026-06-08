@@ -14,6 +14,8 @@ type Props = {
   loading?: boolean;
   style?: ViewStyle;
   haptic?: boolean;
+  /** Stretch to full parent width with a larger tap target. */
+  fullWidth?: boolean;
 };
 
 export function PillButton({
@@ -25,6 +27,7 @@ export function PillButton({
   loading,
   style,
   haptic = true,
+  fullWidth = false,
 }: Props) {
   const compact = size === 'compact';
   const bg =
@@ -40,7 +43,7 @@ export function PillButton({
 
   const handlePress = () => {
     if (disabled || loading) return;
-    if (haptic) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (haptic) Haptics.selectionAsync();
     onPress?.();
   };
 
@@ -54,9 +57,11 @@ export function PillButton({
           borderRadius: radii.pill,
           paddingVertical: compact ? spacing.sm : spacing.lg,
           paddingHorizontal: compact ? spacing.lg : spacing.xl,
-          alignSelf: compact ? 'flex-start' : undefined,
+          alignSelf: fullWidth ? 'stretch' : compact ? 'flex-start' : undefined,
+          width: fullWidth ? '100%' : undefined,
           alignItems: 'center',
           justifyContent: 'center',
+          minHeight: fullWidth ? 52 : undefined,
           opacity: disabled ? 0.4 : pressed ? 0.85 : hovered ? 0.92 : 1,
           borderWidth: variant === 'ghost' || variant === 'dark' ? 1 : 0,
           borderColor: hovered ? colors.textMuted : colors.border,

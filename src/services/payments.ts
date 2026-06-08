@@ -63,7 +63,8 @@ export async function purchasePlan(plan: PurchasePlan): Promise<PurchaseResult> 
     if (!pkg) return { ok: false, error: 'No subscription packages configured in RevenueCat.' };
 
     await Purchases.purchasePackage(pkg);
-    useSubscriptionStore.getState().setFromPurchase(plan, 7);
+    useSubscriptionStore.getState().activateSubscription(plan);
+    await refreshSubscriptionStatus();
     return { ok: true };
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Purchase failed';

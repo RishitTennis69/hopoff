@@ -1,6 +1,8 @@
 import { useApiProxy, youtubeKey } from '@/config/env';
 import { searchVideos, type StarterPack, type VideoItem } from '@/data/mock';
 import { ApiError, proxyGet } from '@/utils/apiClient';
+import { MAX_VIDEO_DURATION_SEC } from '@/utils/videoDuration';
+import { fetchVideoDurationsDirect, formatDuration } from '@/utils/youtubeDuration';
 
 export type YouTubeSearchResult =
   | { ok: true; items: VideoItem[]; fromFallback?: boolean }
@@ -32,6 +34,8 @@ export function parseYouTubeId(input: string): string | null {
   return null;
 }
 
+const MAX_DURATION_SEC = MAX_VIDEO_DURATION_SEC;
+
 type YtSearchItem = {
   id: { videoId?: string };
   snippet: {
@@ -39,23 +43,28 @@ type YtSearchItem = {
     channelTitle: string;
     thumbnails: { medium?: { url: string }; high?: { url: string } };
   };
+  durationLabel?: string;
+  durationSec?: number;
 };
 
-function toVideoItem(item: YtSearchItem): VideoItem | null {
+function toVideoItem(item: YtSearchItem, durationSec?: number): VideoItem | null {
   const videoId = item.id?.videoId;
   if (!videoId) return null;
   const thumb = item.snippet.thumbnails.high?.url ?? item.snippet.thumbnails.medium?.url;
+  const sec = item.durationSec ?? durationSec;
+  const duration =
+    item.durationLabel ?? (sec !== undefined && sec > 0 ? formatDuration(sec) : '');
   return {
     id: `yt-${videoId}`,
     title: decodeEntities(item.snippet.title),
     author: decodeEntities(item.snippet.channelTitle),
     source: 'youtube',
     accent: '#1A1A1A',
-    duration: '',
+    duration,
     videoUrl: '',
     kind: 'youtube',
     youtubeId: videoId,
-    thumbnailUrl: thumb,
+    thumbnailUrl: thumb ?? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
   };
 }
 
@@ -63,8 +72,21 @@ export function hasYouTubeKey() {
   return useApiProxy() || youtubeKey().length > 0;
 }
 
-function mapItems(items: YtSearchItem[]): VideoItem[] {
-  return items.map(toVideoItem).filter((v): v is VideoItem => v !== null);
+function mapItems(items: YtSearchItem[], durations?: Map<string, number>): VideoItem[] {
+  return items
+    .map((item) => {
+      const id = item.id?.videoId;
+      const sec = (id ? durations?.get(id) : undefined) ?? item.durationSec;
+      if (sec === undefined || sec <= 0 || sec > MAX_DURATION_SEC) return null;
+      return toVideoItem(item, sec);
+    })
+    .filter((v): v is VideoItem => v !== null);
+}
+
+async function filterByDuration(items: YtSearchItem[], key: string): Promise<VideoItem[]> {
+  const ids = items.map((i) => i.id?.videoId).filter((id): id is string => !!id);
+  const durations = await fetchVideoDurationsDirect(ids, key);
+  return mapItems(items, durations);
 }
 
 /** Search YouTube with structured errors. Falls back to local samples when offline / no key. */
@@ -77,10 +99,18 @@ export async function searchYouTube(query: string, max = 12): Promise<YouTubeSea
       const data = await proxyGet<{ items: YtSearchItem[] }>('/api/youtube/search', {
         q,
         max: String(max),
+        maxDuration: String(MAX_DURATION_SEC),
       });
-      const mapped = mapItems(data.items ?? []);
+      const raw = data.items ?? [];
+      let mapped = mapItems(raw);
+      if (!mapped.length && raw.length) {
+        const key = youtubeKey();
+        if (key) {
+          mapped = await filterByDuration(raw, key);
+        }
+      }
       return mapped.length
-        ? { ok: true, items: mapped }
+        ? { ok: true, items: mapped.slice(0, max) }
         : { ok: true, items: searchVideos(q), fromFallback: true };
     } catch (e) {
       if (e instanceof ApiError) {
@@ -98,12 +128,14 @@ export async function searchYouTube(query: string, max = 12): Promise<YouTubeSea
   }
 
   try {
+    const fetchCount = Math.min(max * 3, 25);
     const params = new URLSearchParams({
       part: 'snippet',
       type: 'video',
-      maxResults: String(max),
+      maxResults: String(fetchCount),
       q,
       safeSearch: 'moderate',
+      videoDuration: 'short',
       key,
     });
     const res = await fetch(`https://www.googleapis.com/youtube/v3/search?${params.toString()}`);
@@ -113,7 +145,7 @@ export async function searchYouTube(query: string, max = 12): Promise<YouTubeSea
       const code = reason === 'quotaExceeded' ? 'quota_exceeded' : 'youtube_error';
       return { ok: false, error: String(reason), code };
     }
-    const mapped = mapItems(data.items ?? []);
+    const mapped = (await filterByDuration(data.items ?? [], key)).slice(0, max);
     return mapped.length
       ? { ok: true, items: mapped }
       : { ok: true, items: searchVideos(q), fromFallback: true };
@@ -131,50 +163,4 @@ export async function fetchPackVideos(pack: StarterPack, max = 4): Promise<Video
   return searchVideos(pack.query).slice(0, max);
 }
 
-/** Turn a shared/pasted URL into a saveable VideoItem. */
-export function videoFromUrl(rawUrl: string): VideoItem | null {
-  const url = rawUrl.trim();
-  if (!url) return null;
-
-  const ytId = parseYouTubeId(url);
-  if (ytId) {
-    return {
-      id: `yt-${ytId}`,
-      title: 'YouTube video',
-      author: 'YouTube',
-      source: 'youtube',
-      accent: '#1A1A1A',
-      duration: '',
-      videoUrl: '',
-      kind: 'youtube',
-      youtubeId: ytId,
-      thumbnailUrl: `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`,
-    };
-  }
-
-  const isTikTok = /tiktok\.com/i.test(url);
-  const isInsta = /instagram\.com/i.test(url);
-  if (isTikTok || isInsta) {
-    return {
-      id: `link-${hashUrl(url)}`,
-      title: isTikTok ? 'TikTok clip' : 'Instagram clip',
-      author: isTikTok ? 'TikTok' : 'Instagram',
-      source: isTikTok ? 'tiktok' : 'instagram',
-      accent: isTikTok ? '#111111' : '#2A1830',
-      duration: '',
-      videoUrl: url,
-      kind: 'link',
-    };
-  }
-
-  return null;
-}
-
-function hashUrl(url: string) {
-  let h = 0;
-  for (let i = 0; i < url.length; i++) {
-    h = (h << 5) - h + url.charCodeAt(i);
-    h |= 0;
-  }
-  return Math.abs(h).toString(36);
-}
+export { videoFromShareUrl as videoFromUrl } from '@/utils/videoMetadata';

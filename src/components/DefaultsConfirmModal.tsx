@@ -1,7 +1,7 @@
 import { Modal, Pressable, View } from 'react-native';
 import { AppText } from './AppText';
-import { GlassCard } from './GlassCard';
 import { PillButton } from './PillButton';
+import { PopupPanel } from './PopupPanel';
 import { colors, spacing } from '@/theme';
 
 type Props = {
@@ -23,10 +23,10 @@ export function DefaultsConfirmModal({
 }: Props) {
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onCancel}>
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center' }}>
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'center' }}>
         <Pressable style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} onPress={onCancel} />
         <View style={{ paddingHorizontal: spacing.xl }}>
-          <GlassCard style={{ gap: spacing.lg }}>
+          <PopupPanel>
             <AppText variant="title" style={{ fontSize: 22 }}>
               {title}
             </AppText>
@@ -35,7 +35,7 @@ export function DefaultsConfirmModal({
             </AppText>
             <PillButton label={confirmLabel} onPress={onConfirm} />
             <PillButton label="Go back" variant="ghost" onPress={onCancel} />
-          </GlassCard>
+          </PopupPanel>
         </View>
       </View>
     </Modal>

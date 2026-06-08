@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { AppText } from './AppText';
 import { CheckCircle } from './CheckCircle';
 import type { VideoItem } from '@/data/mock';
+import { isDisplayDuration } from '@/utils/videoDuration';
 import { colors, glass, radii, spacing } from '@/theme';
 
 type Props = {
@@ -98,9 +99,7 @@ export function VideoCard({
   }, [flashAdd, pulse]);
 
   const handleAdd = () => {
-    Haptics.notificationAsync(
-      active ? Haptics.NotificationFeedbackType.Warning : Haptics.NotificationFeedbackType.Success,
-    );
+    Haptics.selectionAsync();
     onToggle();
   };
 
@@ -135,7 +134,7 @@ export function VideoCard({
             />
           ) : null}
           <PlayBadge />
-          {video.duration ? (
+          {isDisplayDuration(video.duration) ? (
             <View
               style={{
                 position: 'absolute',

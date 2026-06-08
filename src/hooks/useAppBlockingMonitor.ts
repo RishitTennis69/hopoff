@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { AppState, Platform } from 'react-native';
+import HopoffDevice from 'hopoff-device';
 import { useRouter, usePathname } from 'expo-router';
 import { useAppsStore } from '@/store/appsStore';
 import { useInterventionStore } from '@/store/interventionStore';
@@ -7,6 +8,7 @@ import { useOnboardingStore } from '@/store/onboardingStore';
 import { usePermissionsStore } from '@/store/permissionsStore';
 import { useUsageStore } from '@/store/usageStore';
 import { syncMonitoring, type MonitoredApp } from '@/services/appBlocking';
+import { syncDeviceData } from '@/services/deviceUsage';
 
 /**
  * Keeps native monitoring in sync with app groups and opens the block overlay
@@ -22,21 +24,40 @@ export function useAppBlockingMonitor() {
   const clearIntervention = useInterventionStore((s) => s.clear);
   const bgAt = useRef<number | null>(null);
 
+  // Refresh installed apps + screen time history when monitoring is active.
+  useEffect(() => {
+    if (!completed || !screenTimeAuthorized || Platform.OS === 'web') return;
+    syncDeviceData(7).catch(() => {});
+  }, [completed, screenTimeAuthorized]);
+
   // Sync monitored apps whenever groups change.
   useEffect(() => {
     if (!completed || !screenTimeAuthorized) return;
+    const installed = new Set(useAppsStore.getState().installedAppIds);
     const apps: MonitoredApp[] = groups.flatMap((g) =>
-      g.appIds.map((appId) => ({
-        appId,
-        limitHours: g.hours,
-        groupId: g.id,
-      })),
+      g.appIds
+        .filter((appId) => installed.has(appId))
+        .map((appId) => ({
+          appId,
+          limitHours: g.hours,
+          groupId: g.id,
+        })),
     );
     syncMonitoring(apps).catch(() => {});
   }, [completed, screenTimeAuthorized, groups]);
 
-  // Dev simulation: returning from background adds 5 min to a random limited app.
+  // Native limit events (Android AccessibilityService).
   useEffect(() => {
+    if (!HopoffDevice?.addListener) return;
+    const sub = HopoffDevice.addListener('onLimitExceeded', ({ appId }) => {
+      useInterventionStore.getState().trigger(appId);
+    });
+    return () => sub.remove();
+  }, []);
+
+  // Dev simulation: returning from background adds usage to test the block overlay.
+  useEffect(() => {
+    if (!__DEV__) return;
     if (!completed || !screenTimeAuthorized || Platform.OS === 'web') return;
     if (!groups.length) return;
 

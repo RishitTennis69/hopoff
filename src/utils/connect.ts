@@ -2,25 +2,32 @@ import { Alert, Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
+import HopoffDevice from 'hopoff-device';
 import { apiBaseUrl, notionClientId, shortcutUrl, useApiProxy } from '@/config/env';
 import { proxyPost } from '@/utils/apiClient';
 import { useGoalsStore } from '@/store/goalsStore';
 
 const NOTION_AUTH_URL = 'https://api.notion.com/v1/oauth/authorize';
+const DEV_BUILD_REDIRECT = 'hoptfoff://notion-callback';
 
 export function hasNotionClient() {
   return useApiProxy() || notionClientId().length > 0;
 }
 
+export function isExpoGo(): boolean {
+  return Constants.appOwnership === 'expo';
+}
+
 /** Redirect URI sent to Notion — must match exactly in your Notion integration settings. */
 export function getNotionRedirectUri(): string {
-  const runtime = Linking.createURL('notion-callback');
-  const custom = Linking.createURL('notion-callback', { scheme: 'hoptfoff' });
+  if (isExpoGo()) {
+    return Linking.createURL('notion-callback');
+  }
+  return DEV_BUILD_REDIRECT;
+}
 
-  // Expo Go uses exp:// — custom scheme works in dev/production builds
-  if (Constants.appOwnership === 'expo') return runtime;
-  if (custom.startsWith('hoptfoff://')) return custom;
-  return runtime;
+export function getNotionEnvironmentLabel(): string {
+  return isExpoGo() ? 'Expo Go (unstable exp:// URI)' : 'Dev/production build (hoptfoff://)';
 }
 
 type NotionTokenResponse = {
@@ -38,14 +45,35 @@ async function exchangeNotionCode(code: string, redirectUri: string): Promise<No
   }
 }
 
-function showNotionSetupHelp(redirectUri: string) {
-  const message =
-    `In Notion → your HopOff connection → Redirect URIs, add this exact URL:\n\n${redirectUri}\n\n` +
-    (Constants.appOwnership === 'expo'
-      ? 'In Expo Go this URL changes if your dev server IP/port changes — update Notion when that happens, or use a development build (hoptfoff://notion-callback).'
-      : 'Use a development build for a stable hoptfoff:// redirect.');
+function notionFailureReason(redirectUri: string, step: 'auth' | 'code' | 'token'): string {
+  const env = getNotionEnvironmentLabel();
+  const base = `Environment: ${env}\nURI sent to Notion: ${redirectUri}\n\n`;
 
-  Alert.alert('Notion redirect URI', message);
+  if (step === 'auth') {
+    if (isExpoGo()) {
+      return (
+        base +
+        'OAuth did not return to the app. In Expo Go the redirect URI changes when your dev server IP or port changes — add the exact URI above to Notion, or switch to a dev build and use hoptfoff://notion-callback only.'
+      );
+    }
+    return (
+      base +
+      'OAuth did not return to the app. In Notion → your integration → Redirect URIs, add exactly:\n\nhoptfoff://notion-callback\n\nThen rebuild/reinstall the dev client if you recently changed app.json.'
+    );
+  }
+
+  if (step === 'code') {
+    return base + 'Notion redirected back but no authorization code was found. Check that the redirect URI in Notion matches the URI above character-for-character.';
+  }
+
+  return (
+    base +
+    'Notion authorized the app but token exchange failed. Confirm NOTION_CLIENT_ID and NOTION_CLIENT_SECRET on Vercel match your Notion integration, then redeploy.'
+  );
+}
+
+function showNotionSetupHelp(redirectUri: string, step: 'auth' | 'code' | 'token' = 'auth') {
+  Alert.alert('Notion connect', notionFailureReason(redirectUri, step));
 }
 
 /**
@@ -68,6 +96,13 @@ export async function connectNotion(): Promise<boolean> {
     return false;
   }
 
+  if (__DEV__ && isExpoGo()) {
+    console.warn(
+      '[notion] Expo Go redirect URI (add to Notion if testing in Go):',
+      redirectUri,
+    );
+  }
+
   const url =
     `${NOTION_AUTH_URL}?owner=user&response_type=code` +
     `&client_id=${encodeURIComponent(clientId)}` +
@@ -77,14 +112,14 @@ export async function connectNotion(): Promise<boolean> {
     const result = await WebBrowser.openAuthSessionAsync(url, redirectUri);
     if (result.type !== 'success' || !result.url) {
       if (result.type === 'cancel') return false;
-      showNotionSetupHelp(redirectUri);
+      showNotionSetupHelp(redirectUri, 'auth');
       return false;
     }
 
     const parsed = Linking.parse(result.url);
     const code = typeof parsed.queryParams?.code === 'string' ? parsed.queryParams.code : null;
     if (!code) {
-      showNotionSetupHelp(redirectUri);
+      showNotionSetupHelp(redirectUri, 'code');
       return false;
     }
 
@@ -94,25 +129,62 @@ export async function connectNotion(): Promise<boolean> {
       return true;
     }
 
-    Alert.alert(
-      'Notion connect failed',
-      'OAuth succeeded but token exchange failed. Check NOTION_CLIENT_SECRET on Vercel.',
-    );
+    showNotionSetupHelp(redirectUri, 'token');
     return false;
   } catch {
-    if (Platform.OS !== 'web') showNotionSetupHelp(redirectUri);
+    if (Platform.OS !== 'web') showNotionSetupHelp(redirectUri, 'auth');
     return false;
   }
 }
 
-/** Pull goals from a Notion database — requires backend + user token. */
+type NotionGoalsResponse = {
+  goals: string[];
+  databaseTitle?: string;
+};
+
+/** Pull goals from the first Notion database shared with HopOff. */
 export async function syncGoalsFromNotion(): Promise<string | null> {
   const token = useGoalsStore.getState().notionAccessToken;
   if (!token || !apiBaseUrl()) return null;
-  return null;
+
+  try {
+    const data = await proxyPost<NotionGoalsResponse>('/api/notion/goals', { accessToken: token });
+    if (!data.goals?.length) return null;
+    return data.goals.map((g) => `• ${g}`).join('\n');
+  } catch {
+    return null;
+  }
 }
 
 const SHORTCUT_FALLBACK = 'https://www.icloud.com/shortcuts/';
+const GOOGLE_TASKS_PACKAGE = 'com.google.android.apps.tasks';
+
+/** Opens Google Tasks on Android, or Play Store if not installed. */
+export async function openGoogleTasks(): Promise<boolean> {
+  if (Platform.OS !== 'android') return false;
+
+  try {
+    if (HopoffDevice?.getInstalledPackages) {
+      const installed = await HopoffDevice.getInstalledPackages([GOOGLE_TASKS_PACKAGE]);
+      if (installed.includes(GOOGLE_TASKS_PACKAGE)) {
+        const opened = await Linking.openURL(
+          `intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=${GOOGLE_TASKS_PACKAGE};end`,
+        );
+        return opened;
+      }
+    }
+  } catch {
+    /* fall through */
+  }
+
+  try {
+    await Linking.openURL(`market://details?id=${GOOGLE_TASKS_PACKAGE}`);
+    return true;
+  } catch {
+    await Linking.openURL(`https://play.google.com/store/apps/details?id=${GOOGLE_TASKS_PACKAGE}`);
+    return true;
+  }
+}
 
 export async function openShortcut(serviceId: string): Promise<void> {
   const id = serviceId === 'reminders' || serviceId === 'notes' ? serviceId : null;

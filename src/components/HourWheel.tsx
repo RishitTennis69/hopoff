@@ -8,7 +8,6 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import Svg, { Circle, Line, Path, G } from 'react-native-svg';
-import * as Haptics from 'expo-haptics';
 import { AppText } from './AppText';
 import { AppIcon } from './AppIcon';
 import { getApp } from '@/data/mock';
@@ -42,7 +41,7 @@ export function HourWheel({
   appIds = [],
   hours,
   onChange,
-  max = 8,
+  max = 7,
   size = 240,
   accent = colors.text,
 }: Props) {
@@ -60,17 +59,10 @@ export function HourWheel({
     angleAccum.current = (hours / max) * Math.PI * 2;
   }, [hours, max]);
 
-  const hapticFor = (h: number) => {
-    if (h <= 2) return Haptics.ImpactFeedbackStyle.Light;
-    if (h <= 4) return Haptics.ImpactFeedbackStyle.Medium;
-    return Haptics.ImpactFeedbackStyle.Heavy;
-  };
-
   const apply = (h: number) => {
     const clamped = Math.max(1, Math.min(max, h));
     if (clamped !== lastHours.current) {
       lastHours.current = clamped;
-      Haptics.impactAsync(hapticFor(clamped));
       onChange(clamped);
     }
     displayFrac.value = withSpring(clamped / max, SPRING);

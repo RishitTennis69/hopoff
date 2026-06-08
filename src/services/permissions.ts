@@ -1,7 +1,42 @@
 import { Platform } from 'react-native';
 import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition';
 import { usePermissionsStore } from '@/store/permissionsStore';
-import { confirmScreenTimeAccess, requestScreenTimeAccess } from '@/services/appBlocking';
+import {
+  openPermissionSettings,
+  requestScreenTimeAccess,
+} from '@/services/appBlocking';
+import { nativeAppBlocking } from '@/services/appBlocking/native';
+import { hasUsageAccess } from '@/services/deviceUsage';
+
+export { openPermissionSettings };
+
+export type PermissionStepId = 'accessibility' | 'usage' | 'screen_time';
+
+export async function verifyPermissionStep(
+  step: PermissionStepId,
+): Promise<{ ok: boolean; message?: string }> {
+  if (step === 'usage') {
+    const ok = await hasUsageAccess();
+    return ok
+      ? { ok: true }
+      : {
+          ok: false,
+          message:
+            'Usage access is still off. Open Usage access, select HopOff, and allow it — then tap I\u2019ve enabled this.',
+        };
+  }
+
+  const ok = await nativeAppBlocking.isAuthorized();
+  if (ok) return { ok: true };
+
+  return {
+    ok: false,
+    message:
+      step === 'accessibility'
+        ? 'HopOff isn\u2019t enabled in Accessibility yet. Find HopOff in the list, turn the switch on, then tap I\u2019ve enabled this.'
+        : 'Screen Time access isn\u2019t enabled yet. Allow HopOff in Screen Time, then tap I\u2019ve enabled this.',
+  };
+}
 
 export async function requestMicAndSpeechAccess(): Promise<boolean> {
   if (Platform.OS === 'web') {
@@ -28,8 +63,15 @@ export async function requestAllHopOffPermissions(): Promise<{
   };
 }
 
-export async function finalizeScreenTimePermission(): Promise<boolean> {
-  return confirmScreenTimeAccess();
+/** Dev / testing — HopOff may not appear in Accessibility until a production build. */
+export async function skipPermissionsForDev(): Promise<void> {
+  usePermissionsStore.getState().setScreenTimeAuthorized(true);
+  usePermissionsStore.getState().setMicAuthorized(true);
+}
+
+export async function finalizeScreenTimePermission(step: PermissionStepId): Promise<boolean> {
+  const result = await verifyPermissionStep(step);
+  return result.ok;
 }
 
 export function getPermissionLabels() {

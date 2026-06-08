@@ -6,10 +6,13 @@ import { AppText } from '@/components/AppText';
 import { GlassCard } from '@/components/GlassCard';
 import { Screen } from '@/components/Screen';
 import { restorePurchases } from '@/services/payments';
+import { useSubscriptionStore } from '@/store/subscriptionStore';
 import { colors, spacing } from '@/theme';
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const mustSubscribe = useSubscriptionStore((s) => s.mustSubscribe());
+  const expireTrialForTesting = useSubscriptionStore((s) => s.expireTrialForTesting);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -54,6 +57,17 @@ export default function SettingsScreen() {
         Settings
       </AppText>
 
+      {mustSubscribe ? (
+        <GlassCard style={{ gap: spacing.sm, marginBottom: spacing.xl }}>
+          <AppText variant="subheading" color={colors.text}>
+            Subscription required
+          </AppText>
+          <AppText variant="caption" color={colors.textMuted}>
+            Your free week has ended. Choose a plan on the main tabs to keep using HopOff.
+          </AppText>
+        </GlassCard>
+      ) : null}
+
       <GlassCard style={{ gap: spacing.sm }}>
         <AppText variant="subheading" color={colors.text}>
           Subscription
@@ -90,6 +104,34 @@ export default function SettingsScreen() {
           </AppText>
         ) : null}
       </GlassCard>
+
+      {__DEV__ ? (
+        <GlassCard style={{ gap: spacing.sm, marginTop: spacing.xl }}>
+          <AppText variant="subheading" color={colors.text}>
+            Developer
+          </AppText>
+          <AppText variant="caption" color={colors.textMuted}>
+            Expire the free week to preview the post-trial pricing popup.
+          </AppText>
+          <Pressable
+            onPress={expireTrialForTesting}
+            style={({ pressed, hovered }) => ({
+              marginTop: spacing.sm,
+              paddingVertical: spacing.md,
+              paddingHorizontal: spacing.lg,
+              borderRadius: 999,
+              borderWidth: 1,
+              borderColor: colors.border,
+              alignItems: 'center',
+              opacity: pressed ? 0.7 : hovered ? 0.9 : 1,
+            })}
+          >
+            <AppText variant="small" color={colors.textMuted}>
+              Expire trial (test)
+            </AppText>
+          </Pressable>
+        </GlassCard>
+      ) : null}
     </Screen>
   );
 }

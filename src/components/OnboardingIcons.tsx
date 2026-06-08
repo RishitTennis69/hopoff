@@ -41,8 +41,13 @@ export function OnboardingIcon({ name, size = 22, color = colors.accent }: Props
     case 'present':
       return (
         <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-          <Circle cx="12" cy="12" r="8" stroke={color} strokeWidth={1.8} />
-          <Path d="M12 8v8M8 12h8" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+          <Path
+            d="M12 21s-6.5-4.2-6.5-9.5a6.5 6.5 0 1 1 13 0C18.5 16.8 12 21 12 21z"
+            stroke={color}
+            strokeWidth={1.8}
+            strokeLinejoin="round"
+          />
+          <Circle cx="12" cy="11.5" r="2.2" stroke={color} strokeWidth={1.8} />
         </Svg>
       );
     case 'target':
@@ -62,8 +67,14 @@ export function OnboardingIcon({ name, size = 22, color = colors.accent }: Props
     case 'habit':
       return (
         <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-          <Path d="M4 12a8 8 0 1 0 16 0" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
-          <Path d="M12 4v4M12 16v4" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+          <Path
+            d="M17 3a4 4 0 0 1 0 8H7a4 4 0 1 1 2.8-6.9A5.5 5.5 0 0 1 17 3z"
+            stroke={color}
+            strokeWidth={1.8}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <Path d="M8 14h8M8 18h5" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
         </Svg>
       );
     default:

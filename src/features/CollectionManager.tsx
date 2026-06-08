@@ -11,7 +11,9 @@ import { VideoCard } from '@/components/VideoCard';
 import { VideoPlayerModal } from '@/components/VideoPlayerModal';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { searchVideos, type VideoItem } from '@/data/mock';
+import { useShareFeedbackStore } from '@/store/shareFeedbackStore';
 import { useVideoStore } from '@/store/videoStore';
+import { enrichVideoMetadata } from '@/utils/videoMetadata';
 import { searchYouTube } from '@/utils/youtube';
 import { colors, fonts, glass, radii, spacing } from '@/theme';
 
@@ -96,7 +98,10 @@ export function CollectionManager({ onSelectModeChange }: Props = {}) {
   const [flashId, setFlashId] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
   const { online } = useNetworkStatus();
-  const { added, addVideo, addMany, removeVideo, isAdded } = useVideoStore();
+  const { added, addVideo, addMany, removeVideo, isAdded, updateVideo } = useVideoStore();
+  const shareMessage = useShareFeedbackStore((s) => s.message);
+  const shareFlashId = useShareFeedbackStore((s) => s.flashVideoId);
+  const clearShareFeedback = useShareFeedbackStore((s) => s.clear);
 
   useEffect(() => {
     let cancelled = false;
@@ -133,13 +138,26 @@ export function CollectionManager({ onSelectModeChange }: Props = {}) {
   }, [query]);
 
   const gap = spacing.md;
-  const cardW = width > 0 ? (width - gap) / 2 : 0;
+  const minCardW = 128;
+  const cols = width >= minCardW * 2 + gap ? 2 : width > 0 ? 1 : 0;
+  const cardW = cols > 0 ? Math.floor((width - gap * (cols - 1)) / cols) : 0;
   const onLayout = (e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width);
 
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2200);
   };
+
+  useEffect(() => {
+    if (!shareMessage) return;
+    showToast(shareMessage);
+    if (shareFlashId) {
+      setFlashId(shareFlashId);
+      setTimeout(() => setFlashId(null), 1200);
+    }
+    const t = setTimeout(clearShareFeedback, 2400);
+    return () => clearTimeout(t);
+  }, [shareMessage, shareFlashId, clearShareFeedback]);
 
   // Library mode: toggle add/remove directly
   const handleLibraryToggle = (v: VideoItem) => {
@@ -237,7 +255,7 @@ export function CollectionManager({ onSelectModeChange }: Props = {}) {
           <View style={{ marginTop: spacing.md }}>
             <SearchBar
             variant="dark"
-            placeholder='Try "discipline motivation" or a creator you follow'
+            placeholder='Try "David Goggins"'
             value={input}
             onChangeText={setInput}
             onSubmit={triggerSearch}
@@ -314,7 +332,13 @@ export function CollectionManager({ onSelectModeChange }: Props = {}) {
       {/* Video grid */}
       <View
         onLayout={onLayout}
-        style={{ flexDirection: 'row', flexWrap: 'wrap', gap, marginTop: spacing.lg }}
+        style={{
+          width: '100%',
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap,
+          marginTop: spacing.lg,
+        }}
       >
         {cardW > 0 &&
           shownVideos.map((v) => (
@@ -326,7 +350,15 @@ export function CollectionManager({ onSelectModeChange }: Props = {}) {
               mode={isSelectMode ? 'select' : 'add'}
               active={isSelectMode ? selected.has(v.id) : isAdded(v.id)}
               flashAdd={flashId === v.id}
-              onPlay={() => setPlaying(v)}
+              onPlay={() => {
+                setPlaying(v);
+                if (v.kind === 'link') {
+                  enrichVideoMetadata(v).then((enriched) => {
+                    updateVideo(enriched);
+                    setPlaying(enriched);
+                  });
+                }
+              }}
               onToggle={() => isSelectMode ? handleSelectToggle(v) : handleLibraryToggle(v)}
             />
           ))}
