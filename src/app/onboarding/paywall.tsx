@@ -7,7 +7,6 @@ import { GlassCard } from '@/components/GlassCard';
 import { OnboardingScreen } from '@/features/OnboardingScreen';
 import { startFreeWeek } from '@/services/payments';
 import { useOnboardingStore } from '@/store/onboardingStore';
-import { SubscriptionTerms } from '@/components/SubscriptionTerms';
 import { colors, spacing } from '@/theme';
 
 const PREMIUM = [
@@ -99,7 +98,6 @@ export default function OnboardingPaywall() {
           </View>
         ))}
       </GlassCard>
-      <SubscriptionTerms compact />
     </OnboardingScreen>
   );
 }

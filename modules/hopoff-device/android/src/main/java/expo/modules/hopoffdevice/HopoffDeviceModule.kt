@@ -63,10 +63,10 @@ class HopoffDeviceModule : Module() {
       val pm = appContext.reactContext?.packageManager ?: return@AsyncFunction emptyList<String>()
       packages.filter { pkg ->
         try {
-          pm.getPackageInfo(pkg, 0)
+          pm.getPackageInfo(pkg, PackageManager.GET_ACTIVITIES)
           true
         } catch (_: PackageManager.NameNotFoundException) {
-          false
+          pm.getLaunchIntentForPackage(pkg) != null
         }
       }
     }

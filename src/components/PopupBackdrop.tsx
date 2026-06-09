@@ -19,7 +19,9 @@ export function PopupBackdrop({
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
         onPress={dismiss}
       />
-      <View style={{ paddingHorizontal: spacing.xl }}>{children}</View>
+      <View style={{ paddingHorizontal: spacing.xl }} pointerEvents="box-none">
+        <View pointerEvents="auto">{children}</View>
+      </View>
     </View>
   );
 }

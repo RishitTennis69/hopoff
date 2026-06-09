@@ -61,9 +61,20 @@ async function scrapeOpenGraph(pageUrl: string): Promise<OEmbed | null> {
   });
   if (!res.ok) return null;
   const html = await res.text();
-  const title = decodeEntities(meta(html, 'og:title') ?? '');
+  const ogTitle = decodeEntities(meta(html, 'og:title') ?? '');
   const thumbnail_url = absolutizeUrl(pageUrl, meta(html, 'og:image'));
-  const author_name = decodeEntities(meta(html, 'og:site_name') ?? '');
+  let title = ogTitle;
+  let author_name = decodeEntities(meta(html, 'og:site_name') ?? '');
+
+  const onInsta = ogTitle.match(/^(.+?)\s+on Instagram(?::\s*(.+))?$/i);
+  if (onInsta) {
+    const who = onInsta[1].trim();
+    const handle = who.match(/\(@([^\)]+)\)/);
+    author_name = handle?.[1] || who.replace(/^@/, '') || author_name;
+    const caption = onInsta[2]?.replace(/^["']|["']$/g, '').trim();
+    title = caption || who.replace(/\s*\(@[^)]+\)/, '').trim() || ogTitle;
+  }
+
   if (!title && !thumbnail_url) return null;
   return {
     title: title || undefined,

@@ -228,14 +228,20 @@ export function GoalsEditor({ minHeight = 220 }: { minHeight?: number }) {
       ) : null}
 
       {goalsText.trim().length > 0 && (
-        <PillButton
-          label="Polish my list"
-          variant="dark"
-          size="compact"
-          loading={polishing}
-          style={{ marginTop: spacing.sm, borderColor: colors.text, borderWidth: 1 }}
-          onPress={handlePolish}
-        />
+        <View style={{ marginTop: spacing.md, gap: spacing.xs }}>
+          <PillButton
+            label="Polish my list"
+            variant="dark"
+            fullWidth
+            loading={polishing}
+            style={{ borderColor: colors.text, borderWidth: 1 }}
+            onPress={handlePolish}
+          />
+          <AppText variant="caption" color={colors.textMuted} center>
+            Clear goals power your block screen and weekly insights. Polish turns a brain-dump into
+            sharp bullets you&apos;ll actually see when you slip.
+          </AppText>
+        </View>
       )}
 
       <AppText variant="subheading" style={{ marginTop: spacing.xxl, marginBottom: spacing.md }}>

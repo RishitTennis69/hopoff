@@ -44,6 +44,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "./plugins/withAndroidPackageQueries.js",
       "expo-router",
       "expo-dev-client",
       [

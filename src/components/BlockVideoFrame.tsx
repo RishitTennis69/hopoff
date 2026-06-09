@@ -1,31 +1,25 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useRef } from 'react';
 import { View } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { MotivationVideo } from './MotivationVideo';
-import { DEFAULT_LIBRARY, WELCOME_YOUTUBE_ID, type VideoItem } from '@/data/mock';
+import { DEFAULT_LIBRARY, type VideoItem } from '@/data/mock';
 import { useVideoStore } from '@/store/videoStore';
 import { parseDurationLabel } from '@/utils/timeSaved';
 import { isUnderMinute } from '@/utils/videoDuration';
 import { colors, radii } from '@/theme';
 
-function pickVideo(library: VideoItem[]): VideoItem {
+function fallbackVideo(): VideoItem {
+  return DEFAULT_LIBRARY.find((v) => isUnderMinute(v.duration)) ?? DEFAULT_LIBRARY[0];
+}
+
+/** Random clip from the user's library (≤60s). New pick each time the overlay mounts. */
+function pickRandomVideo(library: VideoItem[]): VideoItem {
   const eligible = library.filter((v) => isUnderMinute(v.duration));
-  const fromLib = eligible.find((v) => v.youtubeId) ?? eligible[0];
-  const fallback = DEFAULT_LIBRARY.find((v) => isUnderMinute(v.duration)) ?? DEFAULT_LIBRARY[0];
-  return (
-    fromLib ??
-    fallback ?? {
-      id: 'fallback',
-      title: '',
-      author: '',
-      source: 'youtube',
-      accent: '',
-      duration: '0:45',
-      videoUrl: '',
-      kind: 'youtube',
-      youtubeId: WELCOME_YOUTUBE_ID,
-    }
-  );
+  const pool = eligible.length
+    ? eligible
+    : DEFAULT_LIBRARY.filter((v) => isUnderMinute(v.duration));
+  if (!pool.length) return fallbackVideo();
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 function Mp4Frame({ video, onWatched }: { video: VideoItem; onWatched: () => void }) {
@@ -56,8 +50,12 @@ type Props = {
 
 export function BlockVideoFrame({ onWatched }: Props) {
   const library = useVideoStore((s) => s.added);
-  const video = useMemo(() => pickVideo(library), [library]);
-  const durationSec = useMemo(() => parseDurationLabel(video.duration), [video.duration]);
+  const videoRef = useRef<VideoItem | null>(null);
+  if (!videoRef.current) {
+    videoRef.current = pickRandomVideo(library);
+  }
+  const video = videoRef.current;
+  const durationSec = parseDurationLabel(video.duration);
   const handleWatched = () => onWatched(durationSec > 0 ? durationSec : 57);
 
   return (
@@ -84,11 +82,11 @@ export function BlockVideoFrame({ onWatched }: Props) {
         <Mp4Frame video={video} onWatched={handleWatched} />
       ) : (
         <MotivationVideo
-          youtubeId={WELCOME_YOUTUBE_ID}
+          youtubeId={DEFAULT_LIBRARY[0].youtubeId!}
           muted={false}
           loop={false}
           radius={radii.xl}
-          durationSec={57}
+          durationSec={durationSec > 0 ? durationSec : 45}
           onWatched={handleWatched}
         />
       )}

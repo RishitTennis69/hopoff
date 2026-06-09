@@ -3,7 +3,14 @@ import { persist } from 'zustand/middleware';
 import { APP_CATALOG } from '@/data/mock';
 import { zustandStorage } from './storage';
 
-const DEFAULT_INSTALLED = APP_CATALOG.map((a) => a.id);
+/** Empty until native detection runs — avoids showing every catalog app on device. */
+const DEFAULT_INSTALLED: string[] = [];
+
+const FULL_CATALOG_IDS = APP_CATALOG.map((a) => a.id);
+
+function isStaleFullCatalog(ids: string[]): boolean {
+  return ids.length === FULL_CATALOG_IDS.length && FULL_CATALOG_IDS.every((id) => ids.includes(id));
+}
 
 export type Group = {
   id: string;
@@ -71,10 +78,20 @@ export const useAppsStore = create<AppsState>()(
         set((s) => ({ groups: s.groups.map((g) => (g.id === id ? { ...g, hours } : g)) })),
       updateGroup: (id, patch) =>
         set((s) => ({ groups: s.groups.map((g) => (g.id === id ? { ...g, ...patch } : g)) })),
-      setInstalledAppIds: (ids) =>
-        set({ installedAppIds: ids.length ? ids : DEFAULT_INSTALLED }),
+      setInstalledAppIds: (ids) => set({ installedAppIds: ids }),
       groupedAppIds: () => get().groups.flatMap((g) => g.appIds),
     }),
-    { name: 'hopoff-apps', storage: zustandStorage },
+    {
+      name: 'hopoff-apps',
+      storage: zustandStorage,
+      version: 2,
+      migrate: (state) => {
+        const s = state as AppsState;
+        if (s?.installedAppIds && isStaleFullCatalog(s.installedAppIds)) {
+          return { ...s, installedAppIds: [] };
+        }
+        return s;
+      },
+    },
   ),
 );

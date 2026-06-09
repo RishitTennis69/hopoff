@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, LayoutChangeEvent, Pressable, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
@@ -6,6 +6,7 @@ import { AppIcon } from '@/components/AppIcon';
 import { AppText } from '@/components/AppText';
 import { GlassCard } from '@/components/GlassCard';
 import { PillButton } from '@/components/PillButton';
+import { SaveToast } from '@/components/SaveToast';
 import { SearchBar } from '@/components/SearchBar';
 import { VideoCard } from '@/components/VideoCard';
 import { VideoPlayerModal } from '@/components/VideoPlayerModal';
@@ -14,14 +15,9 @@ import { searchVideos, type VideoItem } from '@/data/mock';
 import { useShareFeedbackStore } from '@/store/shareFeedbackStore';
 import { useVideoStore } from '@/store/videoStore';
 import { enrichVideoMetadata } from '@/utils/videoMetadata';
+import { formatSavedLabel } from '@/utils/savedLabel';
 import { searchYouTube } from '@/utils/youtube';
 import { colors, fonts, glass, radii, spacing } from '@/theme';
-
-const ADD_MESSAGES = [
-  'Saved to your library',
-  'Added — ready when you need it',
-  'Nice pick. Locked in.',
-];
 
 function ShareArrow() {
   return (
@@ -102,6 +98,18 @@ export function CollectionManager({ onSelectModeChange }: Props = {}) {
   const shareMessage = useShareFeedbackStore((s) => s.message);
   const shareFlashId = useShareFeedbackStore((s) => s.flashVideoId);
   const clearShareFeedback = useShareFeedbackStore((s) => s.clear);
+  const enrichedLinkIds = useRef(new Set<string>());
+
+  useEffect(() => {
+    const generic = /^(Instagram|TikTok)\s+(reel|clip|post|video)/i;
+    for (const v of added) {
+      if (v.kind !== 'link' || !v.videoUrl || enrichedLinkIds.current.has(v.id)) continue;
+      const needsMeta = !v.thumbnailUrl || generic.test(v.title) || !v.author;
+      if (!needsMeta) continue;
+      enrichedLinkIds.current.add(v.id);
+      enrichVideoMetadata(v).then((enriched) => updateVideo(enriched));
+    }
+  }, [added, updateVideo]);
 
   useEffect(() => {
     let cancelled = false;
@@ -168,7 +176,7 @@ export function CollectionManager({ onSelectModeChange }: Props = {}) {
       addVideo(v);
       setFlashId(v.id);
       setTimeout(() => setFlashId(null), 400);
-      showToast(ADD_MESSAGES[Math.floor(Math.random() * ADD_MESSAGES.length)]);
+      showToast(formatSavedLabel(v.title, v.source));
     }
   };
 
@@ -188,8 +196,8 @@ export function CollectionManager({ onSelectModeChange }: Props = {}) {
       addMany(toAdd);
       showToast(
         toAdd.length === 1
-          ? ADD_MESSAGES[Math.floor(Math.random() * ADD_MESSAGES.length)]
-          : `${toAdd.length} videos saved`,
+          ? formatSavedLabel(toAdd[0].title, toAdd[0].source)
+          : `Saved ${toAdd.length} videos`,
       );
     }
     setMode('library');
@@ -266,29 +274,7 @@ export function CollectionManager({ onSelectModeChange }: Props = {}) {
         </View>
       )}
 
-      {/* Toast */}
-      {toast && (
-        <Animated.View
-          entering={FadeIn.duration(200)}
-          exiting={FadeOut.duration(200)}
-          style={{
-            marginTop: spacing.md,
-            backgroundColor: colors.text,
-            borderRadius: radii.pill,
-            paddingVertical: spacing.sm,
-            paddingHorizontal: spacing.lg,
-            alignSelf: 'center',
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: spacing.sm,
-          }}
-        >
-          <Svg width={14} height={14} viewBox="0 0 24 24">
-            <Path d="M20 6L9 17l-5-5" stroke={colors.bg} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-          </Svg>
-          <AppText variant="small" color={colors.bg}>{toast}</AppText>
-        </Animated.View>
-      )}
+      {toast ? <SaveToast message={toast} /> : null}
 
       {searchError && (
         <AppText variant="caption" color={colors.textMuted} style={{ marginTop: spacing.md }}>

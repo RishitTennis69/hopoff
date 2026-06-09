@@ -51,6 +51,7 @@ export function PillButton({
     <Pressable
       onPress={handlePress}
       disabled={disabled || loading}
+      hitSlop={fullWidth ? { top: 8, bottom: 8, left: 4, right: 4 } : undefined}
       style={({ pressed, hovered }) => [
         {
           backgroundColor: bg,

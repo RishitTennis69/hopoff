@@ -47,8 +47,43 @@ function titleFromTikTokPath(path: string): string {
 
 type OEmbed = { title?: string; author_name?: string; thumbnail_url?: string };
 
-async function fetchOEmbed(endpoint: string, pageUrl: string): Promise<OEmbed> {
-  const res = await fetch(`${endpoint}?url=${encodeURIComponent(pageUrl)}&format=json`);
+const FETCH_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (compatible; HopOff/1.0)',
+  Accept: 'application/json',
+};
+
+function parseInstagramMeta(title?: string, author?: string): { title: string; author: string } {
+  let t = title?.trim() ?? '';
+  let a = author?.trim() ?? '';
+
+  const onInsta = t.match(/^(.+?)\s+on Instagram(?::\s*(.+))?$/i);
+  if (onInsta) {
+    const who = onInsta[1].trim();
+    const handle = who.match(/\(@([^\)]+)\)/);
+    a = a || handle?.[1] || who.replace(/^@/, '');
+    const caption = onInsta[2]?.replace(/^["']|["']$/g, '').trim();
+    if (caption) t = caption;
+    else if (handle) t = who.replace(/\s*\(@[^)]+\)/, '').trim() || who;
+  }
+
+  if (!a && t.startsWith('@')) {
+    const [handle, ...rest] = t.split(/\s+/);
+    a = handle.replace('@', '');
+    if (rest.length) t = rest.join(' ').trim();
+  }
+
+  t = t.replace(/\s*•\s*Instagram$/i, '').trim();
+  return { title: t || 'Instagram reel', author: a || 'Instagram' };
+}
+
+async function fetchOEmbed(endpoint: string, pageUrl: string, platform?: 'instagram' | 'tiktok'): Promise<OEmbed> {
+  const params = new URLSearchParams({
+    url: pageUrl,
+    format: 'json',
+  });
+  if (platform === 'instagram') params.set('maxwidth', '640');
+
+  const res = await fetch(`${endpoint}?${params.toString()}`, { headers: FETCH_HEADERS });
   if (!res.ok) return {};
   return (await res.json()) as OEmbed;
 }
@@ -69,16 +104,30 @@ async function fetchYouTubeOEmbed(youtubeId: string): Promise<Partial<VideoItem>
   }
 }
 
-async function fetchLinkOEmbedFromProxy(pageUrl: string): Promise<Partial<VideoItem>> {
+function mapLinkOEmbed(data: OEmbed, platform: 'instagram' | 'tiktok'): Partial<VideoItem> {
+  if (platform === 'instagram') {
+    const parsed = parseInstagramMeta(data.title, data.author_name);
+    return {
+      title: parsed.title,
+      author: parsed.author,
+      thumbnailUrl: data.thumbnail_url,
+    };
+  }
+  return {
+    title: data.title?.trim(),
+    author: data.author_name?.trim() || 'TikTok',
+    thumbnailUrl: data.thumbnail_url,
+  };
+}
+
+async function fetchLinkOEmbedFromProxy(
+  pageUrl: string,
+  platform: 'instagram' | 'tiktok',
+): Promise<Partial<VideoItem>> {
   if (!useApiProxy()) return {};
   try {
     const data = await proxyGet<OEmbed>('/api/oembed', { url: pageUrl });
-    const title = data.title?.trim();
-    return {
-      title: title?.replace(/\s*•\s*Instagram$/i, '').trim() || title,
-      author: data.author_name?.trim(),
-      thumbnailUrl: data.thumbnail_url,
-    };
+    return mapLinkOEmbed(data, platform);
   } catch (e) {
     if (__DEV__ && e instanceof ApiError) {
       console.warn('[oembed] proxy failed', pageUrl, e.status, e.message);
@@ -88,9 +137,6 @@ async function fetchLinkOEmbedFromProxy(pageUrl: string): Promise<Partial<VideoI
 }
 
 async function fetchLinkOEmbed(pageUrl: string, platform: 'instagram' | 'tiktok'): Promise<Partial<VideoItem>> {
-  const proxied = await fetchLinkOEmbedFromProxy(pageUrl);
-  if (proxied.title || proxied.thumbnailUrl || proxied.author) return proxied;
-
   const endpoints =
     platform === 'instagram'
       ? ['https://api.instagram.com/oembed', 'https://www.instagram.com/oembed']
@@ -98,13 +144,9 @@ async function fetchLinkOEmbed(pageUrl: string, platform: 'instagram' | 'tiktok'
 
   for (const endpoint of endpoints) {
     try {
-      const data = await fetchOEmbed(endpoint, pageUrl);
+      const data = await fetchOEmbed(endpoint, pageUrl, platform);
       if (data.title || data.author_name || data.thumbnail_url) {
-        return {
-          title: data.title?.trim(),
-          author: data.author_name?.trim(),
-          thumbnailUrl: data.thumbnail_url,
-        };
+        return mapLinkOEmbed(data, platform);
       }
     } catch {
       /* try next */
@@ -112,17 +154,16 @@ async function fetchLinkOEmbed(pageUrl: string, platform: 'instagram' | 'tiktok'
   }
 
   try {
-    const data = await fetchOEmbed('https://noembed.com/embed', pageUrl);
+    const data = await fetchOEmbed('https://noembed.com/embed', pageUrl, platform);
     if (data.title || data.author_name || data.thumbnail_url) {
-      return {
-        title: data.title?.trim(),
-        author: data.author_name?.trim(),
-        thumbnailUrl: data.thumbnail_url,
-      };
+      return mapLinkOEmbed(data, platform);
     }
   } catch {
     /* fall through */
   }
+
+  const proxied = await fetchLinkOEmbedFromProxy(pageUrl, platform);
+  if (proxied.title || proxied.thumbnailUrl || proxied.author) return proxied;
 
   return {};
 }

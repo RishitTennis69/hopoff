@@ -14,8 +14,14 @@ type Props = {
   interactive?: boolean;
 };
 
+function formatGroupLimit(hours: number) {
+  if (hours < 1) return `${Math.round(hours * 60)} Min`;
+  if (hours === 1) return '1 Hr';
+  return Number.isInteger(hours) ? `${hours} Hrs` : `${hours.toFixed(1)} Hrs`;
+}
+
 export function GroupCard({ group, onPress, variant = 'light', interactive = false }: Props) {
-  const hrLabel = group.hours === 1 ? '1 Hr' : `${group.hours} Hrs`;
+  const hrLabel = formatGroupLimit(group.hours);
   const content = (
     <>
       <StackedIcons appIds={group.appIds} size={34} />

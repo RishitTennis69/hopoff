@@ -19,11 +19,7 @@ export async function verifyPermissionStep(
     const ok = await hasUsageAccess();
     return ok
       ? { ok: true }
-      : {
-          ok: false,
-          message:
-            'Usage access is still off. Open Usage access, select HopOff, and allow it — then tap I\u2019ve enabled this.',
-        };
+      : { ok: false, message: 'Settings → Usage access → HopOff → Allow' };
   }
 
   const ok = await nativeAppBlocking.isAuthorized();
@@ -33,8 +29,8 @@ export async function verifyPermissionStep(
     ok: false,
     message:
       step === 'accessibility'
-        ? 'HopOff isn\u2019t enabled in Accessibility yet. Find HopOff in the list, turn the switch on, then tap I\u2019ve enabled this.'
-        : 'Screen Time access isn\u2019t enabled yet. Allow HopOff in Screen Time, then tap I\u2019ve enabled this.',
+        ? 'Settings → Accessibility → HopOff → On'
+        : 'Settings → Screen Time → HopOff → Allow',
   };
 }
 

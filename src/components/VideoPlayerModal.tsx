@@ -1,4 +1,5 @@
-import { Image, Linking, Modal, Pressable, ScrollView, View } from 'react-native';
+import { Image } from 'expo-image';
+import { Linking, Modal, Pressable, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { AppIcon } from './AppIcon';
@@ -6,6 +7,8 @@ import { AppText } from './AppText';
 import { MotivationVideo } from './MotivationVideo';
 import { PillButton } from './PillButton';
 import type { VideoItem } from '@/data/mock';
+import { shortLinkTitle } from '@/utils/videoDisplay';
+import { thumbnailSource } from '@/utils/videoThumbnail';
 import { colors, radii, spacing } from '@/theme';
 
 function CloseButton({ onClose }: { onClose: () => void }) {
@@ -41,43 +44,57 @@ function Mp4Player({ video }: { video: VideoItem }) {
 }
 
 function LinkPreview({ video }: { video: VideoItem }) {
+  const platform =
+    video.source === 'instagram' || video.source === 'instagramReels'
+      ? 'Instagram'
+      : video.source === 'tiktok'
+        ? 'TikTok'
+        : null;
+  const title = shortLinkTitle(video.title, video.author, 80);
+  const author =
+    video.author && video.author !== 'Instagram' && video.author !== 'TikTok' ? video.author : null;
+
   return (
     <View style={{ marginHorizontal: spacing.xl, alignItems: 'center', gap: spacing.md }}>
-      <View
-        style={{
-          width: '100%',
-          aspectRatio: 9 / 16,
-          maxHeight: 360,
-          borderRadius: radii.lg,
-          overflow: 'hidden',
-          backgroundColor: video.accent,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        {video.thumbnailUrl ? (
-          <Image
-            source={{ uri: video.thumbnailUrl }}
-            style={{ width: '100%', height: '100%' }}
-            resizeMode="cover"
-          />
-        ) : (
-          <AppIcon brandKey={video.source} size={72} />
-        )}
-      </View>
+      <Pressable onPress={() => Linking.openURL(video.videoUrl)}>
+        <View
+          style={{
+            width: '100%',
+            aspectRatio: 9 / 16,
+            maxHeight: 400,
+            borderRadius: radii.lg,
+            overflow: 'hidden',
+            backgroundColor: video.accent,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {video.thumbnailUrl ? (
+            <Image
+              source={thumbnailSource(video.thumbnailUrl, video.source)}
+              style={{ width: '100%', height: '100%' }}
+              contentFit="cover"
+            />
+          ) : (
+            <AppIcon brandKey={video.source} size={72} />
+          )}
+        </View>
+      </Pressable>
       <AppText variant="subheading" center style={{ paddingHorizontal: spacing.md }}>
-        {video.title}
+        {title}
       </AppText>
-      {video.author && video.author !== video.title ? (
+      {author ? (
         <AppText variant="caption" color={colors.textMuted} center>
-          {video.author}
+          {author}
         </AppText>
       ) : null}
-      <PillButton
-        label={`Watch on ${video.source === 'instagram' ? 'Instagram' : video.source === 'tiktok' ? 'TikTok' : video.author}`}
-        onPress={() => Linking.openURL(video.videoUrl)}
-        fullWidth
-      />
+      {platform ? (
+        <PillButton
+          label={`Open in ${platform}`}
+          onPress={() => Linking.openURL(video.videoUrl)}
+          fullWidth
+        />
+      ) : null}
     </View>
   );
 }
@@ -86,7 +103,12 @@ function Body({ video }: { video: VideoItem }) {
   if (video.kind === 'youtube' && video.youtubeId) {
     return (
       <View style={{ marginHorizontal: spacing.xl }}>
-        <MotivationVideo youtubeId={video.youtubeId} muted={false} loop={false} style={{ maxHeight: 520, alignSelf: 'center' }} />
+        <MotivationVideo
+          youtubeId={video.youtubeId}
+          muted={false}
+          loop={false}
+          style={{ maxHeight: 520, alignSelf: 'center' }}
+        />
       </View>
     );
   }
@@ -104,29 +126,26 @@ type Props = {
 };
 
 export function VideoPlayerModal({ video, onClose }: Props) {
-  const showCaption = video && video.kind !== 'link';
+  const isLink = video?.kind === 'link';
 
   return (
     <Modal visible={!!video} animationType="fade" transparent onRequestClose={onClose}>
       {video ? (
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)' }}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center' }}>
           <CloseButton onClose={onClose} />
-          <ScrollView
-            contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingVertical: spacing.xxxl }}
-            showsVerticalScrollIndicator={false}
-          >
+          <View style={{ paddingVertical: spacing.xxxl }}>
             <Body video={video} />
-            {showCaption ? (
-              <>
-                <AppText variant="subheading" center style={{ marginTop: spacing.lg, paddingHorizontal: spacing.xl }}>
+            {!isLink ? (
+              <View style={{ marginTop: spacing.lg, paddingHorizontal: spacing.xl }}>
+                <AppText variant="subheading" center>
                   {video.title}
                 </AppText>
                 <AppText variant="small" color={colors.textMuted} center style={{ marginTop: spacing.xs }}>
                   {video.author}
                 </AppText>
-              </>
+              </View>
             ) : null}
-          </ScrollView>
+          </View>
         </View>
       ) : null}
     </Modal>

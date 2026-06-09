@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { AppText } from '@/components/AppText';
@@ -7,6 +7,7 @@ import { PillButton } from '@/components/PillButton';
 import { SelectRow } from '@/components/SelectRow';
 import { APP_CATALOG } from '@/data/mock';
 import { useAppsStore } from '@/store/appsStore';
+import { refreshInstalledApps } from '@/services/deviceUsage';
 import { colors, spacing } from '@/theme';
 
 export function AppsManager({ editableGroups = false }: { editableGroups?: boolean }) {
@@ -20,6 +21,19 @@ export function AppsManager({ editableGroups = false }: { editableGroups?: boole
     clearChecked,
     beginGroupFromChecked,
   } = useAppsStore();
+  const [detecting, setDetecting] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setDetecting(true);
+    refreshInstalledApps()
+      .finally(() => {
+        if (!cancelled) setDetecting(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const groupedIds = useMemo(() => groups.flatMap((g) => g.appIds), [groups]);
   const installedSet = useMemo(() => new Set(installedAppIds), [installedAppIds]);
@@ -50,13 +64,15 @@ export function AppsManager({ editableGroups = false }: { editableGroups?: boole
 
   return (
     <View style={{ gap: spacing.md }}>
-      <PillButton
-        label="Create Group"
-        variant="dark"
+      <Pressable
+        onPress={canGroup ? createGroup : undefined}
         disabled={!canGroup}
-        fullWidth
-        onPress={createGroup}
-      />
+        style={{ alignSelf: 'stretch', opacity: canGroup ? 1 : 0.4 }}
+      >
+        <View pointerEvents="none">
+          <PillButton label="Create Group" variant="dark" disabled={!canGroup} fullWidth />
+        </View>
+      </Pressable>
       {groups.length === 0 && (
         <AppText variant="small" color={colors.textMuted} center>
           {canGroup
@@ -102,6 +118,17 @@ export function AppsManager({ editableGroups = false }: { editableGroups?: boole
             </Pressable>
           ) : null}
         </View>
+        {detecting && catalog.length === 0 ? (
+          <AppText variant="bodyRegular" color={colors.textMuted} center style={{ paddingVertical: spacing.md }}>
+            Checking which apps are on your phone…
+          </AppText>
+        ) : null}
+        {!detecting && catalog.length === 0 ? (
+          <AppText variant="bodyRegular" color={colors.textMuted} center style={{ paddingVertical: spacing.md }}>
+            No supported apps detected yet. If you have YouTube or Instagram installed, reload the app — or install
+            the latest dev build so HopOff can read your app list.
+          </AppText>
+        ) : null}
         {ungrouped.map((app) => (
           <SelectRow
             key={app.id}

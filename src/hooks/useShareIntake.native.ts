@@ -28,8 +28,6 @@ export function useShareIntake() {
 
     const added = useVideoStore.getState().addVideo(video);
     if (added) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      useShareFeedbackStore.getState().showSuccess(video.id, video.title);
       router.push('/(tabs)/collection');
     }
 
@@ -38,7 +36,8 @@ export function useShareIntake() {
     enrichVideoMetadata(video).then((enriched) => {
       useVideoStore.getState().updateVideo(enriched);
       if (added) {
-        useShareFeedbackStore.getState().showSuccess(enriched.id, enriched.title);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        useShareFeedbackStore.getState().showSuccess(enriched.id, enriched.title, enriched.source);
       }
     });
   }, [hasShareIntent, shareIntent, resetShareIntent]);

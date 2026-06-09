@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { AppState } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -15,6 +16,7 @@ import {
 import { PhoneFrame } from '@/components/PhoneFrame';
 import { useAppBlockingMonitor } from '@/hooks/useAppBlockingMonitor';
 import { useShareIntake } from '@/hooks/useShareIntake';
+import { refreshInstalledApps } from '@/services/deviceUsage';
 import { initPurchases } from '@/services/payments';
 import { colors } from '@/theme';
 
@@ -26,6 +28,11 @@ function AppBootstrap() {
 
   useEffect(() => {
     initPurchases();
+    refreshInstalledApps().catch(() => {});
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refreshInstalledApps().catch(() => {});
+    });
+    return () => sub.remove();
   }, []);
 
   return null;

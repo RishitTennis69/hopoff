@@ -1,5 +1,6 @@
 import { Alert, Platform } from 'react-native';
 import Constants from 'expo-constants';
+import * as IntentLauncher from 'expo-intent-launcher';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import HopoffDevice from 'hopoff-device';
@@ -8,7 +9,7 @@ import { proxyPost } from '@/utils/apiClient';
 import { useGoalsStore } from '@/store/goalsStore';
 
 const NOTION_AUTH_URL = 'https://api.notion.com/v1/oauth/authorize';
-const DEV_BUILD_REDIRECT = 'hoptfoff://notion-callback';
+const APP_DEEP_LINK = 'hoptfoff://notion-callback';
 
 export function hasNotionClient() {
   return useApiProxy() || notionClientId().length > 0;
@@ -20,14 +21,16 @@ export function isExpoGo(): boolean {
 
 /** Redirect URI sent to Notion — must match exactly in your Notion integration settings. */
 export function getNotionRedirectUri(): string {
-  if (isExpoGo()) {
-    return Linking.createURL('notion-callback');
-  }
-  return DEV_BUILD_REDIRECT;
+  const base = apiBaseUrl();
+  if (base) return `${base}/api/notion-callback`;
+  if (isExpoGo()) return Linking.createURL('notion-callback');
+  return APP_DEEP_LINK;
 }
 
 export function getNotionEnvironmentLabel(): string {
-  return isExpoGo() ? 'Expo Go (unstable exp:// URI)' : 'Dev/production build (hoptfoff://)';
+  if (apiBaseUrl()) return 'HTTPS via API (recommended)';
+  if (isExpoGo()) return 'Expo Go (unstable exp:// URI)';
+  return 'App deep link (hoptfoff://)';
 }
 
 type NotionTokenResponse = {
@@ -58,12 +61,15 @@ function notionFailureReason(redirectUri: string, step: 'auth' | 'code' | 'token
     }
     return (
       base +
-      'OAuth did not return to the app. In Notion → your integration → Redirect URIs, add exactly:\n\nhoptfoff://notion-callback\n\nThen rebuild/reinstall the dev client if you recently changed app.json.'
+      'OAuth did not return to the app. In Notion → your integration → Redirect URIs, add the HTTPS URI above exactly (ends with /api/notion-callback). Redeploy Vercel after adding api/notion-callback if you just pulled this change.'
     );
   }
 
   if (step === 'code') {
-    return base + 'Notion redirected back but no authorization code was found. Check that the redirect URI in Notion matches the URI above character-for-character.';
+    return (
+      base +
+      'Notion redirected back but no authorization code was found. The redirect URI in Notion must match the HTTPS URI above character-for-character.'
+    );
   }
 
   return (
@@ -164,13 +170,30 @@ export async function openGoogleTasks(): Promise<boolean> {
   if (Platform.OS !== 'android') return false;
 
   try {
+    await IntentLauncher.startActivityAsync('android.intent.action.MAIN', {
+      packageName: GOOGLE_TASKS_PACKAGE,
+      flags: 0x10000000,
+    });
+    return true;
+  } catch {
+    /* fall through */
+  }
+
+  try {
+    if (await Linking.canOpenURL('googletasks://')) {
+      await Linking.openURL('googletasks://');
+      return true;
+    }
+  } catch {
+    /* fall through */
+  }
+
+  try {
     if (HopoffDevice?.getInstalledPackages) {
       const installed = await HopoffDevice.getInstalledPackages([GOOGLE_TASKS_PACKAGE]);
-      if (installed.includes(GOOGLE_TASKS_PACKAGE)) {
-        const opened = await Linking.openURL(
-          `intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=${GOOGLE_TASKS_PACKAGE};end`,
-        );
-        return opened;
+      if (!installed.includes(GOOGLE_TASKS_PACKAGE)) {
+        await Linking.openURL(`market://details?id=${GOOGLE_TASKS_PACKAGE}`);
+        return true;
       }
     }
   } catch {

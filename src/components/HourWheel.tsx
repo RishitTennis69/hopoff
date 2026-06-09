@@ -21,6 +21,8 @@ type Props = {
   size?: number;
   /** Arc + knob color. Defaults to white to match the B&W system. */
   accent?: string;
+  /** Hours per spoke (default 1). Group modal uses 0.5. */
+  valuePerSpoke?: number;
 };
 
 const SPRING = { damping: 20, stiffness: 140 };
@@ -37,6 +39,14 @@ function arcPath(cx: number, cy: number, r: number, startDeg: number, endDeg: nu
   return `M ${start.x} ${start.y} A ${r} ${r} 0 ${large} 1 ${end.x} ${end.y}`;
 }
 
+function formatDisplayHours(hours: number, halfHourSpokes: boolean) {
+  if (halfHourSpokes && hours % 1 !== 0) {
+    return { value: String(Math.round(hours * 60)), unit: 'Minutes' };
+  }
+  const value = Number.isInteger(hours) ? String(hours) : hours.toFixed(1);
+  return { value, unit: hours === 1 ? 'Hour' : 'Hours' };
+}
+
 export function HourWheel({
   appIds = [],
   hours,
@@ -44,26 +54,30 @@ export function HourWheel({
   max = 7,
   size = 240,
   accent = colors.text,
+  valuePerSpoke = 1,
 }: Props) {
-  const lastHours = useRef(hours);
+  const toInternal = (h: number) => Math.max(1, Math.min(max, Math.round(h / valuePerSpoke) || 1));
+  const lastHours = useRef(toInternal(hours));
   const angleAccum = useRef(0);
   const lastAngle = useRef<number | null>(null);
-  const displayFrac = useSharedValue(hours / max);
+  const displayFrac = useSharedValue(lastHours.current / max);
 
   const cx = size / 2;
   const cy = size / 2;
   const r = size / 2 - 24;
 
   useEffect(() => {
-    displayFrac.value = withSpring(hours / max, SPRING);
-    angleAccum.current = (hours / max) * Math.PI * 2;
-  }, [hours, max]);
+    const internal = toInternal(hours);
+    lastHours.current = internal;
+    displayFrac.value = withSpring(internal / max, SPRING);
+    angleAccum.current = (internal / max) * Math.PI * 2;
+  }, [hours, max, valuePerSpoke]);
 
-  const apply = (h: number) => {
-    const clamped = Math.max(1, Math.min(max, h));
+  const apply = (internal: number) => {
+    const clamped = Math.max(1, Math.min(max, internal));
     if (clamped !== lastHours.current) {
       lastHours.current = clamped;
-      onChange(clamped);
+      onChange(clamped * valuePerSpoke);
     }
     displayFrac.value = withSpring(clamped / max, SPRING);
   };
@@ -106,11 +120,13 @@ export function HourWheel({
     .onUpdate((e) => runOnJS(fromTouch)(e.x, e.y))
     .onEnd(() => runOnJS(resetDrag)());
 
-  const fraction = hours / max;
+  const internal = toInternal(hours);
+  const fraction = internal / max;
   const endDeg = -90 + Math.min(fraction, 0.9999) * 360;
   const knob = polar(cx, cy, r, endDeg);
   const hasApps = appIds.length > 0;
   const n = hasApps ? appIds.length : max;
+  const center = formatDisplayHours(hours, valuePerSpoke < 1);
 
   const centerStyle = useAnimatedStyle(() => ({
     opacity: 0.85 + displayFrac.value * 0.15,
@@ -165,10 +181,10 @@ export function HourWheel({
             pointerEvents="none"
           >
             <AppText variant="hero" color={colors.text}>
-              {hours}
+              {center.value}
             </AppText>
             <AppText variant="small" color={colors.textMuted}>
-              {hours === 1 ? 'Hour' : 'Hours'}
+              {center.unit}
             </AppText>
           </Animated.View>
         </View>

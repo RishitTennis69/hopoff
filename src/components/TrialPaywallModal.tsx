@@ -1,11 +1,10 @@
 import { useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, View } from 'react-native';
+import { Modal, Pressable, ScrollView, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { AppText } from './AppText';
 import { PillButton } from './PillButton';
 import { PopupPanel } from './PopupPanel';
-import { SubscriptionTerms } from './SubscriptionTerms';
-import { purchasePlan, restorePurchases, type PurchasePlan } from '@/services/payments';
+import { purchasePlan, type PurchasePlan } from '@/services/payments';
 import { colors, glass, radii, spacing } from '@/theme';
 
 const BENEFITS = [
@@ -72,7 +71,7 @@ type Props = {
 
 export function TrialPaywallModal({ visible }: Props) {
   const [selected, setSelected] = useState<PurchasePlan>('annual');
-  const [busy, setBusy] = useState<PurchasePlan | 'restore' | null>(null);
+  const [busy, setBusy] = useState<PurchasePlan | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   const onContinue = async () => {
@@ -80,14 +79,6 @@ export function TrialPaywallModal({ visible }: Props) {
     setBusy(selected);
     setMessage(null);
     const result = await purchasePlan(selected);
-    setBusy(null);
-    if (!result.ok) setMessage(result.error);
-  };
-
-  const onRestore = async () => {
-    setBusy('restore');
-    setMessage(null);
-    const result = await restorePurchases();
     setBusy(null);
     if (!result.ok) setMessage(result.error);
   };
@@ -176,10 +167,10 @@ export function TrialPaywallModal({ visible }: Props) {
               </View>
 
               <PillButton
-                label={busy && busy !== 'restore' ? 'Continuing…' : 'Continue'}
+                label={busy ? 'Continuing…' : 'Continue'}
                 onPress={onContinue}
                 disabled={!selected || !!busy}
-                loading={busy !== null && busy !== 'restore'}
+                loading={busy !== null}
               />
 
               <View style={{ gap: spacing.sm }}>
@@ -201,22 +192,6 @@ export function TrialPaywallModal({ visible }: Props) {
                   {message}
                 </AppText>
               ) : null}
-
-              <Pressable
-                onPress={onRestore}
-                disabled={!!busy}
-                style={({ pressed }) => ({ alignItems: 'center', opacity: pressed || busy ? 0.6 : 1 })}
-              >
-                {busy === 'restore' ? (
-                  <ActivityIndicator color={colors.textMuted} />
-                ) : (
-                  <AppText variant="small" color={colors.textMuted}>
-                    Restore purchases
-                  </AppText>
-                )}
-              </Pressable>
-
-              <SubscriptionTerms />
             </PopupPanel>
           </ScrollView>
         </View>

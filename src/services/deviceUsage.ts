@@ -19,38 +19,73 @@ export type DeviceSyncResult = {
   usageAccessGranted: boolean;
 };
 
+/** Extra schemes to probe on Android (package queries often block getPackageInfo). */
+const ANDROID_SCHEME_PROBES: { id: string; schemes: string[] }[] = [
+  { id: 'twitter', schemes: ['twitter'] },
+  { id: 'tiktok', schemes: ['tiktok', 'snssdk1128'] },
+  { id: 'youtube', schemes: ['youtube', 'vnd.youtube'] },
+  { id: 'youtube_shorts', schemes: ['youtube', 'vnd.youtube'] },
+  { id: 'instagram', schemes: ['instagram'] },
+  { id: 'instagram_reels', schemes: ['instagram'] },
+  { id: 'snapchat', schemes: ['snapchat'] },
+  { id: 'reddit', schemes: ['reddit'] },
+  { id: 'facebook', schemes: ['fb'] },
+];
+
+async function schemeInstalled(scheme: string): Promise<boolean> {
+  try {
+    return await Linking.canOpenURL(`${scheme}://`);
+  } catch {
+    return false;
+  }
+}
+
+/** Fallback when package queries are blocked — checks if the app handles its URL scheme. */
+async function detectViaUrlSchemes(): Promise<string[]> {
+  const ids = new Set<string>();
+  const probes =
+    Platform.OS === 'android'
+      ? ANDROID_SCHEME_PROBES
+      : APP_PLATFORM_REFS.filter((r) => r.iosScheme).map((r) => ({
+          id: r.id,
+          schemes: [r.iosScheme!],
+        }));
+
+  for (const { id, schemes } of probes) {
+    for (const scheme of schemes) {
+      if (await schemeInstalled(scheme)) {
+        ids.add(id);
+        break;
+      }
+    }
+  }
+  return [...ids];
+}
+
 /** Detect catalog apps installed on this device. */
 export async function detectInstalledCatalogApps(): Promise<string[]> {
+  const ids = new Set<string>();
+
   if (HopoffDevice) {
     try {
       if (Platform.OS === 'android' && HopoffDevice.getInstalledPackages) {
         const packages = await HopoffDevice.getInstalledPackages(androidPackages());
-        const ids = appIdsForInstalledPackages(packages);
-        if (ids.length) return ids;
+        for (const id of appIdsForInstalledPackages(packages)) ids.add(id);
       }
       if (Platform.OS === 'ios' && HopoffDevice.getInstalledSchemes) {
         const schemes = await HopoffDevice.getInstalledSchemes(iosSchemes());
-        const ids = appIdsForInstalledSchemes(schemes);
-        if (ids.length) return ids;
+        for (const id of appIdsForInstalledSchemes(schemes)) ids.add(id);
       }
     } catch {
       /* native module unavailable */
     }
   }
 
-  if (Platform.OS === 'ios') {
-    const ids: string[] = [];
-    for (const ref of APP_PLATFORM_REFS) {
-      if (!ref.iosScheme) continue;
-      try {
-        const can = await Linking.canOpenURL(`${ref.iosScheme}://`);
-        if (can && !ids.includes(ref.id)) ids.push(ref.id);
-      } catch {
-        // ignore
-      }
-    }
-    if (ids.length) return ids;
+  if (Platform.OS === 'ios' || Platform.OS === 'android') {
+    for (const id of await detectViaUrlSchemes()) ids.add(id);
   }
+
+  if (ids.size) return [...ids];
 
   if (Platform.OS === 'web') {
     return APP_CATALOG.map((a) => a.id);
@@ -145,13 +180,17 @@ export async function hasUsageAccess(): Promise<boolean> {
   }
 }
 
+/** Update the catalog filter from packages installed on this device. */
+export async function refreshInstalledApps(): Promise<string[]> {
+  const installedAppIds = await detectInstalledCatalogApps();
+  useAppsStore.getState().setInstalledAppIds(installedAppIds);
+  return installedAppIds;
+}
+
 /** Refresh installed-app list and week chart from the device. */
 export async function syncDeviceData(days = 7): Promise<DeviceSyncResult> {
   try {
-    const installedAppIds = await detectInstalledCatalogApps();
-    if (installedAppIds.length) {
-      useAppsStore.getState().setInstalledAppIds(installedAppIds);
-    }
+    const installedAppIds = await refreshInstalledApps();
 
     const usageAccessGranted = await hasUsageAccess();
     const usageDaysImported = usageAccessGranted ? await importScreenTimeHistory(days) : 0;

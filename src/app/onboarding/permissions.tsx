@@ -14,6 +14,7 @@ import {
   verifyPermissionStep,
   type PermissionStepId,
 } from '@/services/permissions';
+import { syncDeviceData } from '@/services/deviceUsage';
 import { colors, spacing } from '@/theme';
 
 const PRIVACY =
@@ -25,16 +26,10 @@ type SetupStep = {
   path: string;
   openLabel: string;
   settingsStep?: PermissionStepId;
+  skippable?: boolean;
 };
 
 const ANDROID_STEPS: SetupStep[] = [
-  {
-    id: 'accessibility',
-    label: 'Accessibility',
-    path: 'Settings → Accessibility → HopOff → On',
-    openLabel: 'Open Accessibility',
-    settingsStep: 'accessibility',
-  },
   {
     id: 'usage',
     label: 'Usage access',
@@ -43,10 +38,19 @@ const ANDROID_STEPS: SetupStep[] = [
     settingsStep: 'usage',
   },
   {
+    id: 'accessibility',
+    label: 'Accessibility',
+    path: 'Settings → Accessibility → HopOff → On',
+    openLabel: 'Open Accessibility',
+    settingsStep: 'accessibility',
+    skippable: true,
+  },
+  {
     id: 'mic',
     label: 'Microphone (optional)',
-    path: 'Tap Allow when prompted — for voice goals',
+    path: 'Tap Allow when prompted for voice goals',
     openLabel: 'Allow microphone',
+    skippable: true,
   },
 ];
 
@@ -61,8 +65,9 @@ const IOS_STEPS: SetupStep[] = [
   {
     id: 'mic',
     label: 'Microphone (optional)',
-    path: 'Tap Allow when prompted — for voice goals',
+    path: 'Tap Allow when prompted for voice goals',
     openLabel: 'Allow microphone',
+    skippable: true,
   },
 ];
 
@@ -87,7 +92,7 @@ function ShieldIcon({ enabled }: { enabled: boolean }) {
   );
 }
 
-function Check({ filled }: { filled: boolean }) {
+function Check({ filled, active }: { filled: boolean; active: boolean }) {
   return (
     <View
       style={{
@@ -95,7 +100,7 @@ function Check({ filled }: { filled: boolean }) {
         height: 24,
         borderRadius: 12,
         borderWidth: filled ? 0 : 1.5,
-        borderColor: colors.border,
+        borderColor: active ? colors.text : colors.border,
         backgroundColor: filled ? colors.text : 'transparent',
         alignItems: 'center',
         justifyContent: 'center',
@@ -118,7 +123,6 @@ function Check({ filled }: { filled: boolean }) {
 
 export default function OnboardingPermissions() {
   const router = useRouter();
-  const micAuthorized = usePermissionsStore((s) => s.micAuthorized);
   const [busy, setBusy] = useState(false);
   const [completed, setCompleted] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
@@ -126,8 +130,8 @@ export default function OnboardingPermissions() {
   const isAndroid = Platform.OS === 'android';
   const steps = isAndroid ? ANDROID_STEPS : IOS_STEPS;
 
-  const currentStep = steps.find((s) => !completed[s.id]);
-  const allDone = steps.every((s) => completed[s.id]);
+  const focusStep = steps.find((s) => !completed[s.id]);
+  const canContinue = isAndroid ? completed.usage : steps.every((s) => completed[s.id]);
 
   const tryCompleteStep = useCallback(async (stepId: PermissionStepId | 'mic') => {
     if (stepId === 'mic') {
@@ -146,7 +150,7 @@ export default function OnboardingPermissions() {
       setError(null);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } else if (pendingVerify.current === stepId) {
-      setError(result.message ?? 'Not detected yet — finish in Settings, then return here.');
+      setError(result.message ?? 'Finish in Settings, then return here.');
     }
   }, []);
 
@@ -166,11 +170,11 @@ export default function OnboardingPermissions() {
     return () => sub.remove();
   }, [tryCompleteStep]);
 
-  const openCurrentStep = async () => {
-    if (!currentStep || busy) return;
+  const openFocusStep = async () => {
+    if (!focusStep || busy) return;
     setError(null);
 
-    if (currentStep.id === 'mic') {
+    if (focusStep.id === 'mic') {
       setBusy(true);
       await requestMicAndSpeechAccess();
       setCompleted((c) => ({ ...c, mic: true }));
@@ -180,16 +184,26 @@ export default function OnboardingPermissions() {
       return;
     }
 
-    if (currentStep.settingsStep) {
-      pendingVerify.current = currentStep.id as PermissionStepId;
+    if (focusStep.settingsStep) {
+      pendingVerify.current = focusStep.id as PermissionStepId;
       setBusy(true);
-      await openPermissionSettings(currentStep.settingsStep);
+      await openPermissionSettings(focusStep.settingsStep);
       setBusy(false);
     }
   };
 
-  const onContinue = () => {
+  const skipFocusStep = () => {
+    if (!focusStep?.skippable) return;
+    setCompleted((c) => ({ ...c, [focusStep.id]: true }));
+    pendingVerify.current = null;
+    setError(null);
+  };
+
+  const onContinue = async () => {
     usePermissionsStore.getState().setScreenTimeAuthorized(true);
+    if (completed.usage) {
+      await syncDeviceData(7);
+    }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     router.push('/onboarding/paywall');
   };
@@ -201,26 +215,29 @@ export default function OnboardingPermissions() {
     router.push('/onboarding/paywall');
   };
 
-  const title = allDone
+  const title = canContinue
     ? 'Permissions ready.'
     : isAndroid
       ? 'HopOff needs Android Settings access.'
       : 'HopOff needs iPhone Settings access.';
 
-  const subtitle = allDone
+  const subtitle = canContinue
     ? 'Tap Continue to finish setup.'
-    : currentStep
-      ? `${PRIVACY}\n\n${currentStep.path}`
-      : PRIVACY;
+    : focusStep?.path ?? '';
 
   const footer = busy ? (
     <View style={{ alignItems: 'center', paddingVertical: spacing.md }}>
       <ActivityIndicator color={colors.text} />
     </View>
-  ) : allDone ? (
-    <PillButton label="Continue" onPress={onContinue} fullWidth />
-  ) : currentStep ? (
-    <PillButton label={currentStep.openLabel} onPress={openCurrentStep} fullWidth />
+  ) : canContinue ? (
+    <View style={{ gap: spacing.sm }}>
+      {focusStep ? (
+        <PillButton label={focusStep.openLabel} onPress={openFocusStep} fullWidth variant="dark" />
+      ) : null}
+      <PillButton label="Continue" onPress={onContinue} fullWidth />
+    </View>
+  ) : focusStep ? (
+    <PillButton label={focusStep.openLabel} onPress={openFocusStep} fullWidth />
   ) : null;
 
   return (
@@ -233,18 +250,25 @@ export default function OnboardingPermissions() {
       footer={footer}
     >
       <View style={{ alignItems: 'center', marginBottom: spacing.xl }}>
-        <ShieldIcon enabled={allDone} />
+        <ShieldIcon enabled={canContinue} />
       </View>
 
+      <AppText variant="bodyRegular" color={colors.textMuted} style={{ marginBottom: spacing.lg }}>
+        {PRIVACY}
+      </AppText>
+
       <View style={{ gap: spacing.lg, marginBottom: spacing.lg }}>
-        {steps.map((step) => {
+        {steps.map((step, index) => {
           const done = completed[step.id];
-          const current = !allDone && step.id === currentStep?.id;
-          const textColor = done ? colors.textMuted : current ? colors.text : colors.textMuted;
+          const active = step.id === focusStep?.id;
+          const textColor = done ? colors.textMuted : active ? colors.text : colors.textFaint;
 
           return (
             <View key={step.id} style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
-              <Check filled={done} />
+              <AppText variant="caption" color={textColor} style={{ width: 18 }}>
+                {index + 1}.
+              </AppText>
+              <Check filled={done} active={active} />
               <AppText variant="body" color={textColor} style={{ flex: 1 }}>
                 {step.label}
               </AppText>
@@ -253,10 +277,20 @@ export default function OnboardingPermissions() {
         })}
       </View>
 
-      {micAuthorized && completed.mic ? (
-        <AppText variant="small" color={colors.textFaint} style={{ marginBottom: spacing.md }}>
-          Microphone ready.
-        </AppText>
+      {focusStep?.skippable ? (
+        <Pressable
+          onPress={skipFocusStep}
+          style={({ pressed }) => ({
+            marginBottom: spacing.md,
+            paddingVertical: spacing.sm,
+            alignItems: 'center',
+            opacity: pressed ? 0.7 : 1,
+          })}
+        >
+          <AppText variant="small" color={colors.textFaint}>
+            Skip
+          </AppText>
+        </Pressable>
       ) : null}
 
       {error ? (
@@ -265,7 +299,7 @@ export default function OnboardingPermissions() {
         </AppText>
       ) : null}
 
-      {__DEV__ && !allDone ? (
+      {__DEV__ && !canContinue ? (
         <Pressable
           onPress={devBypass}
           style={({ pressed }) => ({
@@ -276,7 +310,7 @@ export default function OnboardingPermissions() {
           })}
         >
           <AppText variant="small" color={colors.textFaint}>
-            Skip permissions (dev testing)
+            Skip
           </AppText>
         </Pressable>
       ) : null}

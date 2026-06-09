@@ -1,11 +1,14 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Image, Pressable, View } from 'react-native';
+import { Animated, Pressable, View } from 'react-native';
+import { Image } from 'expo-image';
 import Svg, { Path } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { AppText } from './AppText';
 import { CheckCircle } from './CheckCircle';
 import type { VideoItem } from '@/data/mock';
 import { isDisplayDuration } from '@/utils/videoDuration';
+import { shortLinkTitle } from '@/utils/videoDisplay';
+import { thumbnailSource } from '@/utils/videoThumbnail';
 import { colors, glass, radii, spacing } from '@/theme';
 
 type Props = {
@@ -87,6 +90,9 @@ export function VideoCard({
 }: Props) {
   const dark = variant === 'dark';
   const thumbH = width * 1.15;
+  const title =
+    video.kind === 'link' ? shortLinkTitle(video.title, video.author, 48) : video.title;
+  const author = video.author;
   const pulse = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -128,9 +134,9 @@ export function VideoCard({
         >
           {video.thumbnailUrl ? (
             <Image
-              source={{ uri: video.thumbnailUrl }}
+              source={thumbnailSource(video.thumbnailUrl, video.source)}
               style={{ position: 'absolute', width: '100%', height: '100%' }}
-              resizeMode="cover"
+              contentFit="cover"
             />
           ) : null}
           <PlayBadge />
@@ -168,11 +174,13 @@ export function VideoCard({
       >
         <View style={{ flex: 1 }}>
           <AppText variant="small" color={dark ? colors.text : colors.cardText} numberOfLines={2}>
-            {video.title}
+            {title}
           </AppText>
-          <AppText variant="caption" color={dark ? colors.textMuted : colors.cardMuted} numberOfLines={1}>
-            {video.author}
-          </AppText>
+          {author ? (
+            <AppText variant="caption" color={dark ? colors.textMuted : colors.cardMuted} numberOfLines={1}>
+              {author}
+            </AppText>
+          ) : null}
         </View>
         {mode === 'add' && (
           <Pressable onPress={handleAdd} hitSlop={8}>
