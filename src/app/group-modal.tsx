@@ -59,7 +59,8 @@ export default function GroupModal() {
               placeholder=""
               placeholderTextColor={colors.textMuted}
               textAlign="center"
-              selectionColor={colors.text}
+              selectionColor="rgba(75, 139, 255, 0.5)"
+              cursorColor="#5B9FFF"
               autoCorrect={false}
               style={{
                 fontFamily: fonts.extraBold,

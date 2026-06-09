@@ -14,6 +14,7 @@ import {
   Inter_900Black,
 } from '@expo-google-fonts/inter';
 import { PhoneFrame } from '@/components/PhoneFrame';
+import { ShareFeedbackToast } from '@/components/ShareFeedbackToast';
 import { useAppBlockingMonitor } from '@/hooks/useAppBlockingMonitor';
 import { useShareIntake } from '@/hooks/useShareIntake';
 import { refreshInstalledApps } from '@/services/deviceUsage';
@@ -85,6 +86,7 @@ export default function RootLayout() {
           <Stack.Screen name="settings" options={{ animation: 'slide_from_right' }} />
         </Stack>
         </PhoneFrame>
+        <ShareFeedbackToast />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

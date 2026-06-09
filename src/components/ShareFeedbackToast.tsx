@@ -13,7 +13,7 @@ export function ShareFeedbackToast() {
 
   useEffect(() => {
     if (!message) return;
-    const t = setTimeout(clear, 2800);
+    const t = setTimeout(clear, 3500);
     return () => clearTimeout(t);
   }, [message, clear]);
 
@@ -27,7 +27,8 @@ export function ShareFeedbackToast() {
         top: insets.top + spacing.sm,
         left: spacing.lg,
         right: spacing.lg,
-        zIndex: 100,
+        zIndex: 9999,
+        elevation: 9999,
         alignItems: 'center',
       }}
     >

@@ -10,6 +10,9 @@ import { useGoalsStore } from '@/store/goalsStore';
 
 const NOTION_AUTH_URL = 'https://api.notion.com/v1/oauth/authorize';
 const APP_DEEP_LINK = 'hoptfoff://notion-callback';
+const DEEP_LINK_GRACE_MS = 3500;
+
+WebBrowser.maybeCompleteAuthSession();
 
 export function hasNotionClient() {
   return useApiProxy() || notionClientId().length > 0;
@@ -114,8 +117,8 @@ export async function connectNotion(): Promise<boolean> {
     `&client_id=${encodeURIComponent(clientId)}` +
     `&redirect_uri=${encodeURIComponent(redirectUri)}`;
 
-  const completeWithCode = async (code: string): Promise<boolean> => {
-    const token = await exchangeNotionCode(code, redirectUri);
+  const completeWithCode = async (code: string, redirect: string): Promise<boolean> => {
+    const token = await exchangeNotionCode(code, redirect);
     if (token?.accessToken) {
       useGoalsStore.getState().setNotionToken(token.accessToken);
       try {
@@ -128,6 +131,16 @@ export async function connectNotion(): Promise<boolean> {
     showNotionSetupHelp(redirectUri, 'token');
     return false;
   };
+
+  try {
+    const initialUrl = await Linking.getInitialURL();
+    if (initialUrl?.includes('notion-callback')) {
+      const code = parseNotionAuthCode(initialUrl);
+      if (code) return completeWithCode(code, redirectUri);
+    }
+  } catch {
+    /* continue with browser flow */
+  }
 
   return new Promise<boolean>((resolve) => {
     let settled = false;
@@ -142,23 +155,31 @@ export async function connectNotion(): Promise<boolean> {
       if (!incoming.includes('notion-callback')) return;
       const code = parseNotionAuthCode(incoming);
       if (!code) return;
-      void completeWithCode(code).then(finish);
+      void completeWithCode(code, redirectUri).then(finish);
     });
 
     void WebBrowser.openAuthSessionAsync(url, redirectUri)
       .then(async (result) => {
         if (settled) return;
-        if (result.type === 'cancel') {
-          finish(false);
-          return;
-        }
+
         if (result.type === 'success' && result.url) {
           const code = parseNotionAuthCode(result.url);
           if (code) {
-            finish(await completeWithCode(code));
+            finish(await completeWithCode(code, redirectUri));
             return;
           }
         }
+
+        if (result.type === 'cancel') {
+          await new Promise((r) => setTimeout(r, DEEP_LINK_GRACE_MS));
+          if (settled) return;
+          finish(false);
+          return;
+        }
+
+        await new Promise((r) => setTimeout(r, DEEP_LINK_GRACE_MS));
+        if (settled) return;
+
         showNotionSetupHelp(redirectUri, 'auth');
         finish(false);
       })

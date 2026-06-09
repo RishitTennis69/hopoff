@@ -28,7 +28,8 @@ function youtubePlayerHtml(id: string, muted: boolean, loop: boolean, hideChrome
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
   <style>
     * { margin: 0; padding: 0; }
-    html, body, #player { width: 100%; height: 100%; background: #000; }
+    html, body { width: 100%; height: 100%; background: #000; overflow: hidden; }
+    #player { width: 100%; height: 100%; background: #000; }
   </style>
 </head>
 <body>
@@ -133,12 +134,17 @@ function NativeEmbed({
   return (
     <WebView
       source={{ html: youtubePlayerHtml(id, muted, loop, hideChrome), baseUrl: APP_REFERER_ORIGIN }}
-      style={{ width: '100%', height: '100%', backgroundColor: '#000' }}
+      style={{ flex: 1, width: '100%', height: '100%', backgroundColor: '#000' }}
       allowsInlineMediaPlayback
       mediaPlaybackRequiresUserAction={false}
       javaScriptEnabled
       domStorageEnabled
       scrollEnabled={false}
+      bounces={false}
+      overScrollMode="never"
+      showsHorizontalScrollIndicator={false}
+      showsVerticalScrollIndicator={false}
+      androidLayerType="hardware"
       onMessage={(e) => {
         if (e.nativeEvent.data === 'ended') onWatched?.();
       }}
@@ -179,7 +185,7 @@ export function MotivationVideo({
           backgroundColor: '#000',
           width: '100%',
         },
-        !style?.height && { aspectRatio: 9 / 16 },
+        !style?.height && !style?.width && { aspectRatio: 9 / 16 },
         style,
       ]}
     >

@@ -11,6 +11,15 @@ import { shortLinkTitle } from '@/utils/videoDisplay';
 import { thumbnailSource } from '@/utils/videoThumbnail';
 import { colors, glass, radii, spacing } from '@/theme';
 
+/** Portrait thumb proportion used in `VideoCard` (height = width × 1.15). */
+const THUMB_HEIGHT_RATIO = 1.15;
+
+function libraryCardWidth(screenW: number): number {
+  const gap = spacing.md;
+  const gridW = screenW - spacing.xl * 2;
+  return Math.floor((gridW - gap) / 2);
+}
+
 function CloseButton({ onClose }: { onClose: () => void }) {
   return (
     <Pressable
@@ -24,7 +33,8 @@ function CloseButton({ onClose }: { onClose: () => void }) {
   );
 }
 
-function Mp4Player({ video }: { video: VideoItem }) {
+function Mp4Player({ video, width }: { video: VideoItem; width: number }) {
+  const height = Math.round(width * THUMB_HEIGHT_RATIO);
   const player = useVideoPlayer(video.videoUrl, (p) => {
     p.loop = false;
     p.muted = false;
@@ -32,11 +42,11 @@ function Mp4Player({ video }: { video: VideoItem }) {
   });
 
   return (
-    <View style={{ marginHorizontal: spacing.xl, borderRadius: radii.lg, overflow: 'hidden' }}>
+    <View style={{ alignSelf: 'center', width, height, borderRadius: radii.lg, overflow: 'hidden' }}>
       <VideoView
         player={player}
-        style={{ width: '100%', aspectRatio: 9 / 16, maxHeight: 520 }}
-        contentFit="contain"
+        style={{ width: '100%', height: '100%' }}
+        contentFit="cover"
         nativeControls
       />
     </View>
@@ -62,12 +72,9 @@ function PlayBadge() {
   );
 }
 
-/** Same portrait thumb proportion as `VideoCard` (height = width × 1.15). */
-const THUMB_HEIGHT_RATIO = 1.15;
-
 function LinkPreview({ video }: { video: VideoItem }) {
   const { width: screenW } = useWindowDimensions();
-  const cardW = Math.min(Math.floor((screenW - spacing.xl * 4) / 2), 168);
+  const cardW = libraryCardWidth(screenW);
   const platform =
     video.source === 'instagram' || video.source === 'instagramReels'
       ? 'Instagram'
@@ -79,7 +86,7 @@ function LinkPreview({ video }: { video: VideoItem }) {
     video.author && video.author !== 'Instagram' && video.author !== 'TikTok' ? video.author : null;
 
   return (
-    <View style={{ marginHorizontal: spacing.xl, alignItems: 'center', gap: spacing.lg }}>
+    <View style={{ alignItems: 'center', gap: spacing.lg, paddingHorizontal: spacing.xl }}>
       <View
         style={{
           width: cardW,
@@ -126,25 +133,31 @@ function LinkPreview({ video }: { video: VideoItem }) {
         </View>
       </View>
       {platform ? (
-        <PillButton
-          label={`Open in ${platform}`}
-          onPress={() => Linking.openURL(video.videoUrl)}
-          fullWidth
-        />
+        <View style={{ width: cardW }}>
+          <PillButton
+            label={`Open in ${platform}`}
+            onPress={() => Linking.openURL(video.videoUrl)}
+            fullWidth
+          />
+        </View>
       ) : null}
     </View>
   );
 }
 
 function Body({ video }: { video: VideoItem }) {
+  const { width: screenW } = useWindowDimensions();
+  const cardW = libraryCardWidth(screenW);
+  const videoH = Math.round(cardW * THUMB_HEIGHT_RATIO);
+
   if (video.kind === 'youtube' && video.youtubeId) {
     return (
-      <View style={{ marginHorizontal: spacing.xl }}>
+      <View style={{ alignItems: 'center', paddingHorizontal: spacing.xl }}>
         <MotivationVideo
           youtubeId={video.youtubeId}
           muted={false}
           loop={false}
-          style={{ maxHeight: 520, alignSelf: 'center' }}
+          style={{ width: cardW, height: videoH, alignSelf: 'center' }}
         />
       </View>
     );
@@ -154,7 +167,7 @@ function Body({ video }: { video: VideoItem }) {
     return <LinkPreview video={video} />;
   }
 
-  return <Mp4Player video={video} />;
+  return <Mp4Player video={video} width={cardW} />;
 }
 
 type Props = {
