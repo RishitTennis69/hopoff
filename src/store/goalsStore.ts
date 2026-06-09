@@ -6,9 +6,13 @@ type GoalsState = {
   goalsText: string;
   connected: string[];
   notionAccessToken: string | null;
+  notionDatabaseId: string | null;
+  goalsPolished: boolean;
   setGoals: (text: string) => void;
   toggleConnected: (id: string) => void;
   setNotionToken: (token: string | null) => void;
+  setNotionDatabaseId: (id: string | null) => void;
+  setGoalsPolished: (polished: boolean) => void;
 };
 
 export const useGoalsStore = create<GoalsState>()(
@@ -17,7 +21,9 @@ export const useGoalsStore = create<GoalsState>()(
       goalsText: '',
       connected: [],
       notionAccessToken: null,
-      setGoals: (text) => set({ goalsText: text }),
+      notionDatabaseId: null,
+      goalsPolished: false,
+      setGoals: (text) => set({ goalsText: text, goalsPolished: false }),
       toggleConnected: (id) =>
         set((s) => ({
           connected: s.connected.includes(id)
@@ -25,6 +31,8 @@ export const useGoalsStore = create<GoalsState>()(
             : [...s.connected, id],
         })),
       setNotionToken: (token) => set({ notionAccessToken: token }),
+      setNotionDatabaseId: (id) => set({ notionDatabaseId: id }),
+      setGoalsPolished: (polished) => set({ goalsPolished: polished }),
     }),
     { name: 'hopoff-goals', storage: zustandStorage },
   ),

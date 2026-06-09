@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-/** HTTPS bridge: Notion redirects here, then we forward to the app deep link. */
+/** Notion OAuth lands here; forwards to the app deep link so the session can close. */
 export default function handler(req: VercelRequest, res: VercelResponse) {
   const qs = new URLSearchParams();
   for (const [key, value] of Object.entries(req.query)) {
@@ -8,7 +8,8 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     else if (Array.isArray(value)) value.forEach((v) => typeof v === 'string' && qs.append(key, v));
   }
 
-  const deepLink = `hoptfoff://notion-callback?${qs.toString()}`;
+  const query = qs.toString();
+  const deepLink = `hoptfoff://notion-callback${query ? `?${query}` : ''}`;
   const safe = deepLink.replace(/"/g, '&quot;');
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -21,11 +22,11 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   <style>
     body { margin: 0; font-family: system-ui, sans-serif; background: #000; color: #fff;
       display: flex; min-height: 100vh; align-items: center; justify-content: center; }
-    p { opacity: 0.7; font-size: 15px; }
+    p { opacity: 0.7; font-size: 15px; text-align: center; padding: 24px; }
   </style>
 </head>
 <body>
-  <p>Returning to HopOff…</p>
+  <p>Connected to Notion.<br />Returning to HopOff…</p>
   <script>window.location.replace("${safe}");</script>
 </body>
 </html>`);

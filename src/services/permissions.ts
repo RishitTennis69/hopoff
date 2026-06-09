@@ -19,7 +19,7 @@ export async function verifyPermissionStep(
     const ok = await hasUsageAccess();
     return ok
       ? { ok: true }
-      : { ok: false, message: 'Settings → Usage access → HopOff → Allow' };
+      : { ok: false, message: 'Usage access → HopOff → Allow' };
   }
 
   const ok = await nativeAppBlocking.isAuthorized();
@@ -29,8 +29,8 @@ export async function verifyPermissionStep(
     ok: false,
     message:
       step === 'accessibility'
-        ? 'Settings → Accessibility → HopOff → On'
-        : 'Settings → Screen Time → HopOff → Allow',
+        ? 'Accessibility → HopOff → On'
+        : 'Screen Time → HopOff → Allow',
   };
 }
 

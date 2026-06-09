@@ -1,5 +1,7 @@
 import { Tabs } from 'expo-router';
+import { View } from 'react-native';
 import { TabIcon } from '@/components/TabIcon';
+import { ShareFeedbackToast } from '@/components/ShareFeedbackToast';
 import { TrialPaywallModal } from '@/components/TrialPaywallModal';
 import { useSubscriptionStore } from '@/store/subscriptionStore';
 import { fonts, colors } from '@/theme';
@@ -10,6 +12,7 @@ export default function TabsLayout() {
   return (
     <>
       <TrialPaywallModal visible={mustSubscribe} />
+      <View style={{ flex: 1 }}>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -54,6 +57,8 @@ export default function TabsLayout() {
         }}
       />
     </Tabs>
+        <ShareFeedbackToast />
+      </View>
     </>
   );
 }

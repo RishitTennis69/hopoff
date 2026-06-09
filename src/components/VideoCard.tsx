@@ -91,7 +91,7 @@ export function VideoCard({
   const dark = variant === 'dark';
   const thumbH = width * 1.15;
   const title =
-    video.kind === 'link' ? shortLinkTitle(video.title, video.author, 48) : video.title;
+    video.kind === 'link' ? shortLinkTitle(video.title, video.author, 36) : video.title;
   const author = video.author;
   const pulse = useRef(new Animated.Value(1)).current;
 

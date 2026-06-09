@@ -114,33 +114,61 @@ export async function connectNotion(): Promise<boolean> {
     `&client_id=${encodeURIComponent(clientId)}` +
     `&redirect_uri=${encodeURIComponent(redirectUri)}`;
 
-  try {
-    const result = await WebBrowser.openAuthSessionAsync(url, redirectUri);
-    if (result.type !== 'success' || !result.url) {
-      if (result.type === 'cancel') return false;
-      showNotionSetupHelp(redirectUri, 'auth');
-      return false;
-    }
-
-    const parsed = Linking.parse(result.url);
-    const code = typeof parsed.queryParams?.code === 'string' ? parsed.queryParams.code : null;
-    if (!code) {
-      showNotionSetupHelp(redirectUri, 'code');
-      return false;
-    }
-
+  const completeWithCode = async (code: string): Promise<boolean> => {
     const token = await exchangeNotionCode(code, redirectUri);
     if (token?.accessToken) {
       useGoalsStore.getState().setNotionToken(token.accessToken);
+      try {
+        await WebBrowser.dismissBrowser();
+      } catch {
+        /* already closed */
+      }
       return true;
     }
-
     showNotionSetupHelp(redirectUri, 'token');
     return false;
-  } catch {
-    if (Platform.OS !== 'web') showNotionSetupHelp(redirectUri, 'auth');
-    return false;
-  }
+  };
+
+  return new Promise<boolean>((resolve) => {
+    let settled = false;
+    const finish = (ok: boolean) => {
+      if (settled) return;
+      settled = true;
+      linkSub.remove();
+      resolve(ok);
+    };
+
+    const linkSub = Linking.addEventListener('url', ({ url: incoming }) => {
+      if (!incoming.includes('notion-callback')) return;
+      const code = parseNotionAuthCode(incoming);
+      if (!code) return;
+      void completeWithCode(code).then(finish);
+    });
+
+    void WebBrowser.openAuthSessionAsync(url, redirectUri)
+      .then(async (result) => {
+        if (settled) return;
+        if (result.type === 'cancel') {
+          finish(false);
+          return;
+        }
+        if (result.type === 'success' && result.url) {
+          const code = parseNotionAuthCode(result.url);
+          if (code) {
+            finish(await completeWithCode(code));
+            return;
+          }
+        }
+        showNotionSetupHelp(redirectUri, 'auth');
+        finish(false);
+      })
+      .catch(() => {
+        if (!settled) {
+          if (Platform.OS !== 'web') showNotionSetupHelp(redirectUri, 'auth');
+          finish(false);
+        }
+      });
+  });
 }
 
 type NotionGoalsResponse = {
@@ -148,13 +176,49 @@ type NotionGoalsResponse = {
   databaseTitle?: string;
 };
 
-/** Pull goals from the first Notion database shared with HopOff. */
-export async function syncGoalsFromNotion(): Promise<string | null> {
+type NotionDatabase = { id: string; title: string };
+
+function parseNotionAuthCode(returnUrl: string): string | null {
+  try {
+    const parsed = Linking.parse(returnUrl);
+    const fromLinking = parsed.queryParams?.code;
+    if (typeof fromLinking === 'string') return fromLinking;
+  } catch {
+    /* fall through */
+  }
+  try {
+    const u = new URL(returnUrl);
+    return u.searchParams.get('code');
+  } catch {
+    return null;
+  }
+}
+
+/** List Notion databases the user shared with HopOff. */
+export async function fetchNotionDatabases(): Promise<NotionDatabase[]> {
   const token = useGoalsStore.getState().notionAccessToken;
+  if (!token || !apiBaseUrl()) return [];
+  try {
+    const data = await proxyPost<{ databases: NotionDatabase[] }>('/api/notion/databases', {
+      accessToken: token,
+    });
+    return data.databases ?? [];
+  } catch {
+    return [];
+  }
+}
+
+/** Pull goals from a shared Notion database. */
+export async function syncGoalsFromNotion(databaseId?: string | null): Promise<string | null> {
+  const token = useGoalsStore.getState().notionAccessToken;
+  const dbId = databaseId ?? useGoalsStore.getState().notionDatabaseId;
   if (!token || !apiBaseUrl()) return null;
 
   try {
-    const data = await proxyPost<NotionGoalsResponse>('/api/notion/goals', { accessToken: token });
+    const data = await proxyPost<NotionGoalsResponse>('/api/notion/goals', {
+      accessToken: token,
+      databaseId: dbId ?? undefined,
+    });
     if (!data.goals?.length) return null;
     return data.goals.map((g) => `• ${g}`).join('\n');
   } catch {

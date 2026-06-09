@@ -18,6 +18,7 @@ import { useAppBlockingMonitor } from '@/hooks/useAppBlockingMonitor';
 import { useShareIntake } from '@/hooks/useShareIntake';
 import { refreshInstalledApps } from '@/services/deviceUsage';
 import { initPurchases } from '@/services/payments';
+import { enrichStarterLibrary } from '@/utils/enrichStarterLibrary';
 import { colors } from '@/theme';
 
 SplashScreen.preventAutoHideAsync();
@@ -29,6 +30,9 @@ function AppBootstrap() {
   useEffect(() => {
     initPurchases();
     refreshInstalledApps().catch(() => {});
+
+    enrichStarterLibrary().catch(() => {});
+
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') refreshInstalledApps().catch(() => {});
     });

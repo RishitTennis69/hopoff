@@ -50,8 +50,8 @@ export default function BlockScreen() {
   return (
     <Screen>
       <View style={{ alignItems: 'center', gap: 4 }}>
-        <EncryptedText text={headline.line1} center duration={750} />
-        <EncryptedText text={headline.line2} center duration={650} delay={120} />
+        <EncryptedText text={headline.line1} center duration={525} />
+        <EncryptedText text={headline.line2} center duration={455} delay={84} />
       </View>
 
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: spacing.lg }}>

@@ -9,6 +9,10 @@ import { PopupPanel } from '@/components/PopupPanel';
 import { useAppsStore } from '@/store/appsStore';
 import { colors, fonts, spacing } from '@/theme';
 
+const PLACEHOLDER = 'Name of your group';
+const NAME_FONT_SIZE = 26;
+const NAME_LINE_HEIGHT = 32;
+
 export default function GroupModal() {
   const router = useRouter();
   const { groupId } = useLocalSearchParams<{ groupId?: string }>();
@@ -18,49 +22,60 @@ export default function GroupModal() {
   const appIds = editing ? editing.appIds : draftAppIds;
 
   const [name, setName] = useState(editing?.name ?? '');
-  const [hours, setHours] = useState(editing?.hours ?? 2);
+  const [hours, setHours] = useState(editing?.hours ?? 0.5);
 
   const save = () => {
-    if (editing) updateGroup(editing.id, { name, hours });
-    else finalizeGroup(name, hours);
+    const groupName = name.trim() || 'My Group';
+    if (editing) updateGroup(editing.id, { name: groupName, hours });
+    else finalizeGroup(groupName, hours);
     if (router.canGoBack()) router.back();
   };
 
   return (
     <PopupBackdrop>
       <PopupPanel>
-        <View style={{ alignSelf: 'stretch', marginBottom: spacing.lg, alignItems: 'center' }}>
-          {!name ? (
-            <AppText
-              variant="title"
-              color={colors.textMuted}
-              center
+        <View style={{ alignSelf: 'stretch', marginBottom: spacing.lg }}>
+          <View style={{ minHeight: NAME_LINE_HEIGHT, justifyContent: 'center' }}>
+            {!name && (
+              <AppText
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  left: spacing.lg,
+                  right: spacing.lg,
+                  fontFamily: fonts.extraBold,
+                  fontSize: NAME_FONT_SIZE,
+                  lineHeight: NAME_LINE_HEIGHT,
+                  color: colors.textMuted,
+                  textAlign: 'center',
+                }}
+              >
+                {PLACEHOLDER}
+              </AppText>
+            )}
+            <TextInput
+              value={name}
+              onChangeText={setName}
+              placeholder=""
+              placeholderTextColor={colors.textMuted}
+              textAlign="center"
+              selectionColor={colors.text}
+              autoCorrect={false}
               style={{
-                position: 'absolute',
                 fontFamily: fonts.extraBold,
-                fontSize: 26,
-                pointerEvents: 'none',
+                fontSize: NAME_FONT_SIZE,
+                lineHeight: NAME_LINE_HEIGHT,
+                color: colors.text,
+                width: '100%',
+                paddingHorizontal: spacing.lg,
+                paddingVertical: 0,
+                margin: 0,
+                minHeight: NAME_LINE_HEIGHT,
+                includeFontPadding: false,
+                textAlignVertical: 'center',
               }}
-            >
-              Name of your group
-            </AppText>
-          ) : null}
-          <TextInput
-            value={name}
-            onChangeText={setName}
-            placeholder=""
-            textAlign="center"
-            selectionColor={colors.text}
-            autoCorrect={false}
-            style={{
-              fontFamily: fonts.extraBold,
-              fontSize: 26,
-              color: colors.text,
-              width: '100%',
-              paddingHorizontal: spacing.lg,
-              includeFontPadding: false,
-            }}
-          />
+            />
+          </View>
         </View>
         <HourWheel appIds={appIds} hours={hours} onChange={setHours} valuePerSpoke={0.5} />
         <View style={{ width: '100%', marginTop: spacing.xxl }}>

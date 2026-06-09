@@ -127,7 +127,7 @@ function ytVideo(
 export const DEFAULT_LIBRARY: VideoItem[] = [
   ytVideo('starter-1', 'Stop scrolling, start living', 'BoltMotivation', WELCOME_YOUTUBE_ID, '0:57'),
   ytVideo('starter-2', 'You have to want it', 'Eric Thomas', 'fJ__hddpGVY', '0:25'),
-  ytVideo('starter-3', 'Motivation clip', 'YouTube', '5f7E4DQG6kk', '0:45'),
+  ytVideo('starter-3', 'GET UP AND GRIND', 'Motivation', '5f7E4DQG6kk', '0:21'),
 ];
 
 export type DayStat = {

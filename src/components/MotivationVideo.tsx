@@ -9,38 +9,99 @@ type Props = {
   style?: ViewStyle;
   youtubeId?: string;
   radius?: number;
-  /** Default true for library previews; welcome screen passes false. */
   muted?: boolean;
-  /** Default true; welcome screen passes false to play once. */
   loop?: boolean;
-  /** Fires once when the clip ends or durationSec elapses. */
   onWatched?: () => void;
-  /** Fallback watch length when embed end events are unavailable. */
+  /** Safety cap when the embed end event never fires. */
   durationSec?: number;
+  /** Hide pause/title chrome on start (block overlay). */
+  hideChrome?: boolean;
 };
 
-function embedUrl(id: string, muted: boolean, loop: boolean) {
+function youtubePlayerHtml(id: string, muted: boolean, loop: boolean, hideChrome: boolean) {
+  const mute = muted ? 1 : 0;
+  const loopFlag = loop ? 1 : 0;
+  const controls = hideChrome ? 0 : 1;
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <style>
+    * { margin: 0; padding: 0; }
+    html, body, #player { width: 100%; height: 100%; background: #000; }
+  </style>
+</head>
+<body>
+  <div id="player"></div>
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script>
+    var player;
+    function post(msg) {
+      if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(msg);
+    }
+    function onYouTubeIframeAPIReady() {
+      player = new YT.Player('player', {
+        videoId: '${id}',
+        playerVars: {
+          autoplay: 1,
+          mute: ${mute},
+          controls: ${controls},
+          playsinline: 1,
+          modestbranding: 1,
+          rel: 0,
+          loop: ${loopFlag},
+          playlist: '${id}',
+          origin: '${APP_REFERER_ORIGIN}',
+          disablekb: ${hideChrome ? 1 : 0},
+          fs: 0,
+          iv_load_policy: 3,
+        },
+        events: {
+          onReady: function() { player.playVideo(); },
+          onStateChange: function(e) {
+            if (e.data === YT.PlayerState.ENDED) post('ended');
+          },
+        },
+      });
+    }
+  </script>
+</body>
+</html>`;
+}
+
+function WebIframe({
+  id,
+  radius,
+  muted,
+  loop,
+  hideChrome,
+}: {
+  id: string;
+  radius: number;
+  muted: boolean;
+  loop: boolean;
+  hideChrome: boolean;
+}) {
   const params = new URLSearchParams({
     autoplay: '1',
     mute: muted ? '1' : '0',
-    controls: '1',
+    controls: hideChrome ? '0' : '1',
     playsinline: '1',
     modestbranding: '1',
     rel: '0',
     enablejsapi: '1',
     origin: APP_REFERER_ORIGIN,
+    disablekb: hideChrome ? '1' : '0',
+    fs: '0',
+    iv_load_policy: '3',
   });
   if (loop) {
     params.set('loop', '1');
     params.set('playlist', id);
   }
-  return `https://www.youtube.com/embed/${id}?${params.toString()}`;
-}
-
-function WebIframe({ id, radius, muted, loop }: { id: string; radius: number; muted: boolean; loop: boolean }) {
   return (
     <iframe
-      src={embedUrl(id, muted, loop)}
+      src={`https://www.youtube.com/embed/${id}?${params.toString()}`}
       title="Motivation"
       referrerPolicy="strict-origin-when-cross-origin"
       style={{
@@ -60,28 +121,18 @@ function NativeEmbed({
   id,
   muted,
   loop,
+  hideChrome,
   onWatched,
 }: {
   id: string;
   muted: boolean;
   loop: boolean;
+  hideChrome: boolean;
   onWatched?: () => void;
 }) {
-  const fired = useRef(false);
-  const fire = () => {
-    if (fired.current || !onWatched) return;
-    fired.current = true;
-    onWatched();
-  };
-
-  const src = embedUrl(id, muted, loop);
-
   return (
     <WebView
-      source={{
-        uri: src,
-        headers: { Referer: APP_REFERER_ORIGIN },
-      }}
+      source={{ html: youtubePlayerHtml(id, muted, loop, hideChrome), baseUrl: APP_REFERER_ORIGIN }}
       style={{ width: '100%', height: '100%', backgroundColor: '#000' }}
       allowsInlineMediaPlayback
       mediaPlaybackRequiresUserAction={false}
@@ -89,7 +140,7 @@ function NativeEmbed({
       domStorageEnabled
       scrollEnabled={false}
       onMessage={(e) => {
-        if (e.nativeEvent.data === 'ended') fire();
+        if (e.nativeEvent.data === 'ended') onWatched?.();
       }}
     />
   );
@@ -103,6 +154,7 @@ export function MotivationVideo({
   loop = true,
   onWatched,
   durationSec,
+  hideChrome = false,
 }: Props) {
   const fired = useRef(false);
   const fire = () => {
@@ -112,8 +164,9 @@ export function MotivationVideo({
   };
 
   useEffect(() => {
-    if (loop || !onWatched || !durationSec || durationSec <= 0) return;
-    const t = setTimeout(fire, durationSec * 1000);
+    if (loop || !onWatched) return;
+    const cap = durationSec && durationSec > 0 ? durationSec + 8 : 120;
+    const t = setTimeout(fire, cap * 1000);
     return () => clearTimeout(t);
   }, [loop, onWatched, durationSec]);
 
@@ -131,9 +184,15 @@ export function MotivationVideo({
       ]}
     >
       {Platform.OS === 'web' ? (
-        <WebIframe id={youtubeId} radius={radius} muted={muted} loop={loop} />
+        <WebIframe id={youtubeId} radius={radius} muted={muted} loop={loop} hideChrome={hideChrome} />
       ) : (
-        <NativeEmbed id={youtubeId} muted={muted} loop={loop} onWatched={onWatched ? fire : undefined} />
+        <NativeEmbed
+          id={youtubeId}
+          muted={muted}
+          loop={loop}
+          hideChrome={hideChrome}
+          onWatched={onWatched ? fire : undefined}
+        />
       )}
     </View>
   );

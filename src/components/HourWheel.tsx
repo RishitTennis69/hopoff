@@ -39,10 +39,7 @@ function arcPath(cx: number, cy: number, r: number, startDeg: number, endDeg: nu
   return `M ${start.x} ${start.y} A ${r} ${r} 0 ${large} 1 ${end.x} ${end.y}`;
 }
 
-function formatDisplayHours(hours: number, halfHourSpokes: boolean) {
-  if (halfHourSpokes && hours % 1 !== 0) {
-    return { value: String(Math.round(hours * 60)), unit: 'Minutes' };
-  }
+function formatDisplayHours(hours: number) {
   const value = Number.isInteger(hours) ? String(hours) : hours.toFixed(1);
   return { value, unit: hours === 1 ? 'Hour' : 'Hours' };
 }
@@ -126,7 +123,7 @@ export function HourWheel({
   const knob = polar(cx, cy, r, endDeg);
   const hasApps = appIds.length > 0;
   const n = hasApps ? appIds.length : max;
-  const center = formatDisplayHours(hours, valuePerSpoke < 1);
+  const center = formatDisplayHours(hours);
 
   const centerStyle = useAnimatedStyle(() => ({
     opacity: 0.85 + displayFrac.value * 0.15,

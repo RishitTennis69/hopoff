@@ -12,6 +12,30 @@ export function formatDuration(sec: number): string {
 
 type ContentDetailsItem = { id: string; contentDetails?: { duration?: string } };
 
+import { useApiProxy, youtubeKey } from '@/config/env';
+import { proxyGet } from '@/utils/apiClient';
+
+/** Resolve durations via Vercel proxy or a local YouTube API key. */
+export async function fetchYouTubeDurations(ids: string[]): Promise<Map<string, number>> {
+  const unique = [...new Set(ids.filter(Boolean))];
+  if (!unique.length) return new Map();
+
+  if (useApiProxy()) {
+    try {
+      const data = await proxyGet<{ durations?: Record<string, number> }>('/api/youtube/durations', {
+        ids: unique.join(','),
+      });
+      return new Map(Object.entries(data.durations ?? {}).map(([id, sec]) => [id, sec]));
+    } catch {
+      return new Map();
+    }
+  }
+
+  const key = youtubeKey();
+  if (!key) return new Map();
+  return fetchVideoDurationsDirect(unique, key);
+}
+
 export async function fetchVideoDurationsDirect(
   ids: string[],
   apiKey: string,

@@ -95,7 +95,6 @@ export function CollectionManager({ onSelectModeChange }: Props = {}) {
   const [searchError, setSearchError] = useState<string | null>(null);
   const { online } = useNetworkStatus();
   const { added, addVideo, addMany, removeVideo, isAdded, updateVideo } = useVideoStore();
-  const shareMessage = useShareFeedbackStore((s) => s.message);
   const shareFlashId = useShareFeedbackStore((s) => s.flashVideoId);
   const clearShareFeedback = useShareFeedbackStore((s) => s.clear);
   const enrichedLinkIds = useRef(new Set<string>());
@@ -157,15 +156,15 @@ export function CollectionManager({ onSelectModeChange }: Props = {}) {
   };
 
   useEffect(() => {
-    if (!shareMessage) return;
-    showToast(shareMessage);
-    if (shareFlashId) {
-      setFlashId(shareFlashId);
-      setTimeout(() => setFlashId(null), 1200);
-    }
-    const t = setTimeout(clearShareFeedback, 2400);
-    return () => clearTimeout(t);
-  }, [shareMessage, shareFlashId, clearShareFeedback]);
+    if (!shareFlashId) return;
+    setFlashId(shareFlashId);
+    const flashTimer = setTimeout(() => setFlashId(null), 1200);
+    const clearTimer = setTimeout(clearShareFeedback, 2800);
+    return () => {
+      clearTimeout(flashTimer);
+      clearTimeout(clearTimer);
+    };
+  }, [shareFlashId, clearShareFeedback]);
 
   // Library mode: toggle add/remove directly
   const handleLibraryToggle = (v: VideoItem) => {

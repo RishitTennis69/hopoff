@@ -33,14 +33,14 @@ const ANDROID_STEPS: SetupStep[] = [
   {
     id: 'usage',
     label: 'Usage access',
-    path: 'Settings → Usage access → HopOff → Allow',
+    path: 'Usage access → HopOff → Allow',
     openLabel: 'Open Usage access',
     settingsStep: 'usage',
   },
   {
     id: 'accessibility',
     label: 'Accessibility',
-    path: 'Settings → Accessibility → HopOff → On',
+    path: 'Accessibility → HopOff → On',
     openLabel: 'Open Accessibility',
     settingsStep: 'accessibility',
     skippable: true,
@@ -58,7 +58,7 @@ const IOS_STEPS: SetupStep[] = [
   {
     id: 'screen_time',
     label: 'Screen Time',
-    path: 'Settings → Screen Time → HopOff → Allow',
+    path: 'Screen Time → HopOff → Allow',
     openLabel: 'Open Screen Time',
     settingsStep: 'screen_time',
   },
@@ -101,7 +101,7 @@ function Check({ filled, active }: { filled: boolean; active: boolean }) {
         borderRadius: 12,
         borderWidth: filled ? 0 : 1.5,
         borderColor: active ? colors.text : colors.border,
-        backgroundColor: filled ? colors.text : 'transparent',
+        backgroundColor: filled ? 'rgba(255,255,255,0.1)' : 'transparent',
         alignItems: 'center',
         justifyContent: 'center',
         marginTop: 2,
@@ -110,7 +110,7 @@ function Check({ filled, active }: { filled: boolean; active: boolean }) {
       <Svg width={14} height={14} viewBox="0 0 24 24">
         <Path
           d="M20 6L9 17l-5-5"
-          stroke={filled ? colors.bg : colors.textMuted}
+          stroke={filled ? colors.text : colors.textMuted}
           strokeWidth={3}
           strokeLinecap="round"
           strokeLinejoin="round"

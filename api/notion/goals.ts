@@ -50,7 +50,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { accessToken } = req.body ?? {};
+  const { accessToken, databaseId: requestedId } = req.body ?? {};
   if (!accessToken || typeof accessToken !== 'string') {
     return res.status(400).json({ error: 'Missing accessToken' });
   }
@@ -81,7 +81,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    const databaseId = databases[0].id as string;
+    const databaseId =
+      typeof requestedId === 'string' && databases.some((d: { id: string }) => d.id === requestedId)
+        ? requestedId
+        : (databases[0].id as string);
     const { res: queryRes, data: queryData } = await notionFetch(`/databases/${databaseId}/query`, accessToken, {
       method: 'POST',
       body: JSON.stringify({ page_size: 50 }),

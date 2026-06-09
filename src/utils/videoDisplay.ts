@@ -1,5 +1,5 @@
 /** Short caption for link-video player (no platform boilerplate). */
-export function shortLinkTitle(title: string, author?: string, maxLen = 52): string {
+export function shortLinkTitle(title: string, author?: string, maxLen = 38): string {
   let t = title.trim();
 
   const onInsta = t.match(/^(.+?)\s+on Instagram:\s*['"]?(.+?)['"]?\s*$/i);

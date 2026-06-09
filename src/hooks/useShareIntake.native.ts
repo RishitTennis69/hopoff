@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { InteractionManager } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useShareIntent } from 'expo-share-intent';
@@ -20,25 +21,24 @@ export function useShareIntake() {
     if (!hasShareIntent) return;
 
     const url = extractShareUrl(shareIntent.webUrl, shareIntent.text);
-    const video = videoFromShareUrl(url);
-    if (!video) {
+    const draft = videoFromShareUrl(url);
+    if (!draft) {
       resetShareIntent();
       return;
     }
 
-    const added = useVideoStore.getState().addVideo(video);
-    if (added) {
-      router.push('/(tabs)/collection');
-    }
-
     resetShareIntent();
 
-    enrichVideoMetadata(video).then((enriched) => {
-      useVideoStore.getState().updateVideo(enriched);
-      if (added) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    void (async () => {
+      const enriched = await enrichVideoMetadata(draft);
+      const added = useVideoStore.getState().addVideo(enriched);
+      if (!added) return;
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.push('/(tabs)/collection');
+      InteractionManager.runAfterInteractions(() => {
         useShareFeedbackStore.getState().showSuccess(enriched.id, enriched.title, enriched.source);
-      }
-    });
+      });
+    })();
   }, [hasShareIntent, shareIntent, resetShareIntent]);
 }

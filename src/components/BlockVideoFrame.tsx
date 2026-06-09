@@ -56,7 +56,8 @@ export function BlockVideoFrame({ onWatched }: Props) {
   }
   const video = videoRef.current;
   const durationSec = parseDurationLabel(video.duration);
-  const handleWatched = () => onWatched(durationSec > 0 ? durationSec : 57);
+  const fallbackSec = durationSec > 0 ? durationSec : 45;
+  const handleWatched = () => onWatched(fallbackSec);
 
   return (
     <View
@@ -75,6 +76,7 @@ export function BlockVideoFrame({ onWatched }: Props) {
           muted={false}
           loop={false}
           radius={radii.xl}
+          hideChrome
           durationSec={durationSec > 0 ? durationSec : undefined}
           onWatched={handleWatched}
         />
@@ -86,6 +88,7 @@ export function BlockVideoFrame({ onWatched }: Props) {
           muted={false}
           loop={false}
           radius={radii.xl}
+          hideChrome
           durationSec={durationSec > 0 ? durationSec : 45}
           onWatched={handleWatched}
         />

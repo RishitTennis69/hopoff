@@ -13,9 +13,8 @@ export function SaveToast({ message }: Props) {
       entering={FadeIn.duration(200)}
       exiting={FadeOut.duration(200)}
       style={{
-        marginTop: spacing.md,
         alignSelf: 'center',
-        maxWidth: '92%',
+        maxWidth: '100%',
       }}
     >
       <Animated.View

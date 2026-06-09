@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, View, TextInput } from 'react-native';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { AppIcon } from '@/components/AppIcon';
@@ -10,7 +10,13 @@ import type { ConnectService } from '@/data/mock';
 import { useSpeechToText } from '@/hooks/useSpeechToText';
 import { useGoalsStore } from '@/store/goalsStore';
 import { polishGoalsWithAi } from '@/utils/ai';
-import { connectNotion, openGoogleTasks, openShortcut, syncGoalsFromNotion } from '@/utils/connect';
+import {
+  connectNotion,
+  fetchNotionDatabases,
+  openGoogleTasks,
+  openShortcut,
+  syncGoalsFromNotion,
+} from '@/utils/connect';
 import { colors, glass, fonts, radii, spacing } from '@/theme';
 
 function ConnectRow({
@@ -76,12 +82,34 @@ function MicIcon({ active }: { active: boolean }) {
   );
 }
 
-export function GoalsEditor({ minHeight = 220 }: { minHeight?: number }) {
-  const { goalsText, setGoals, connected, toggleConnected } = useGoalsStore();
+export type GoalsEditorHandle = {
+  polish: () => Promise<void>;
+};
+
+type GoalsEditorProps = {
+  minHeight?: number;
+  /** Hide inline polish button (onboarding uses footer instead). */
+  hidePolishButton?: boolean;
+};
+
+export const GoalsEditor = forwardRef<GoalsEditorHandle, GoalsEditorProps>(function GoalsEditor(
+  { minHeight = 220, hidePolishButton = false },
+  ref,
+) {
+  const {
+    goalsText,
+    setGoals,
+    connected,
+    toggleConnected,
+    notionDatabaseId,
+    setNotionDatabaseId,
+  } = useGoalsStore();
   const rawDump = useRef('');
   const [polishing, setPolishing] = useState(false);
   const [editing, setEditing] = useState(false);
   const [connectingId, setConnectingId] = useState<string | null>(null);
+  const [notionDatabases, setNotionDatabases] = useState<{ id: string; title: string }[]>([]);
+  const [importingNotion, setImportingNotion] = useState(false);
 
   const handleConnect = async (service: ConnectService) => {
     if (connected.includes(service.id)) {
@@ -93,8 +121,9 @@ export function GoalsEditor({ minHeight = 220 }: { minHeight?: number }) {
       const ok = await connectNotion();
       if (ok) {
         toggleConnected(service.id);
-        const imported = await syncGoalsFromNotion();
-        if (imported) setGoals(imported);
+        const dbs = await fetchNotionDatabases();
+        setNotionDatabases(dbs);
+        if (dbs.length === 1) setNotionDatabaseId(dbs[0].id);
       }
       setConnectingId(null);
       return;
@@ -135,9 +164,23 @@ export function GoalsEditor({ minHeight = 220 }: { minHeight?: number }) {
     if (!source) return;
     setPolishing(true);
     const polished = await polishGoalsWithAi(source);
-    if (polished) setGoals(polished);
+    if (polished) {
+      useGoalsStore.setState({ goalsText: polished, goalsPolished: true });
+    }
     setEditing(false);
     setPolishing(false);
+  };
+
+  useImperativeHandle(ref, () => ({
+    polish: handlePolish,
+  }));
+
+  const importFromNotion = async () => {
+    if (!notionDatabaseId) return;
+    setImportingNotion(true);
+    const imported = await syncGoalsFromNotion(notionDatabaseId);
+    if (imported) setGoals(imported);
+    setImportingNotion(false);
   };
 
   const lines = goalsText.split('\n').filter(Boolean);
@@ -227,21 +270,21 @@ export function GoalsEditor({ minHeight = 220 }: { minHeight?: number }) {
         </AppText>
       ) : null}
 
-      {goalsText.trim().length > 0 && (
-        <View style={{ marginTop: spacing.md, gap: spacing.xs }}>
-          <PillButton
-            label="Polish my list"
-            variant="dark"
-            fullWidth
-            loading={polishing}
-            style={{ borderColor: colors.text, borderWidth: 1 }}
-            onPress={handlePolish}
-          />
-          <AppText variant="caption" color={colors.textMuted} center>
-            Clear goals power your block screen and weekly insights. Polish turns a brain-dump into
-            sharp bullets you&apos;ll actually see when you slip.
-          </AppText>
-        </View>
+      {!hidePolishButton && goalsText.trim().length > 0 && (
+        <PillButton
+          label="Polish my list"
+          variant="dark"
+          size="compact"
+          loading={polishing}
+          style={{
+            marginTop: spacing.sm,
+            borderColor: colors.text,
+            borderWidth: 1,
+            paddingVertical: 10,
+            paddingHorizontal: 20,
+          }}
+          onPress={handlePolish}
+        />
       )}
 
       <AppText variant="subheading" style={{ marginTop: spacing.xxl, marginBottom: spacing.md }}>
@@ -258,6 +301,37 @@ export function GoalsEditor({ minHeight = 220 }: { minHeight?: number }) {
           />
         ))}
       </View>
+
+      {connected.includes('notion') && notionDatabases.length > 0 ? (
+        <View style={{ marginTop: spacing.lg, gap: spacing.sm }}>
+          <AppText variant="caption" color={colors.textMuted}>
+            Choose a Notion database to import
+          </AppText>
+          {notionDatabases.map((db) => {
+            const selected = notionDatabaseId === db.id;
+            return (
+              <Pressable key={db.id} onPress={() => setNotionDatabaseId(db.id)}>
+                <GlassCard
+                  selected={selected}
+                  style={{ paddingVertical: spacing.sm, paddingHorizontal: spacing.md }}
+                >
+                  <AppText variant="body" color={selected ? colors.text : colors.textMuted}>
+                    {db.title}
+                  </AppText>
+                </GlassCard>
+              </Pressable>
+            );
+          })}
+          <PillButton
+            label="Import from Notion"
+            variant="dark"
+            size="compact"
+            disabled={!notionDatabaseId}
+            loading={importingNotion}
+            onPress={importFromNotion}
+          />
+        </View>
+      ) : null}
     </View>
   );
-}
+});
