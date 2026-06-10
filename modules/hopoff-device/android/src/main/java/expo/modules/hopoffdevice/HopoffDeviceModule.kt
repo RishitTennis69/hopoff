@@ -63,12 +63,26 @@ class HopoffDeviceModule : Module() {
       val pm = appContext.reactContext?.packageManager ?: return@AsyncFunction emptyList<String>()
       packages.filter { pkg ->
         try {
-          pm.getPackageInfo(pkg, PackageManager.GET_ACTIVITIES)
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            pm.getPackageInfo(pkg, PackageManager.PackageInfoFlags.of(0))
+          } else {
+            @Suppress("DEPRECATION")
+            pm.getPackageInfo(pkg, 0)
+          }
           true
         } catch (_: PackageManager.NameNotFoundException) {
           pm.getLaunchIntentForPackage(pkg) != null
         }
       }
+    }
+
+    AsyncFunction("openPackage") { packageName: String ->
+      val ctx = appContext.reactContext ?: return@AsyncFunction false
+      val intent = ctx.packageManager.getLaunchIntentForPackage(packageName)
+        ?: return@AsyncFunction false
+      intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      ctx.startActivity(intent)
+      true
     }
 
     AsyncFunction("getInstalledSchemes") { _schemes: List<String> ->

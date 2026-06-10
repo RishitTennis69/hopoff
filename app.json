@@ -17,7 +17,9 @@
         "LSApplicationQueriesSchemes": [
           "twitter",
           "tiktok",
+          "snssdk1128",
           "youtube",
+          "vnd.youtube",
           "instagram",
           "snapchat",
           "reddit",

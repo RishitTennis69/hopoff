@@ -85,9 +85,27 @@ function showNotionSetupHelp(redirectUri: string, step: 'auth' | 'code' | 'token
   Alert.alert('Notion connect', notionFailureReason(redirectUri, step));
 }
 
-/**
- * Kick off Notion OAuth. Token exchange runs via backend when EXPO_PUBLIC_API_BASE_URL is set.
- */
+/** Exchange a Notion OAuth code for a token and mark Notion connected. */
+export async function completeNotionOAuthFromCode(code: string): Promise<boolean> {
+  const redirectUri = getNotionRedirectUri();
+  const token = await exchangeNotionCode(code, redirectUri);
+  if (!token?.accessToken) return false;
+
+  const store = useGoalsStore.getState();
+  store.setNotionToken(token.accessToken);
+  if (!store.connected.includes('notion')) {
+    store.toggleConnected('notion');
+  }
+
+  try {
+    await WebBrowser.dismissBrowser();
+  } catch {
+    /* already closed */
+  }
+  return true;
+}
+
+/** Kick off Notion OAuth. Token exchange runs via backend when EXPO_PUBLIC_API_BASE_URL is set. */
 export async function connectNotion(): Promise<boolean> {
   const clientId = notionClientId();
   if (!clientId) {
@@ -117,26 +135,17 @@ export async function connectNotion(): Promise<boolean> {
     `&client_id=${encodeURIComponent(clientId)}` +
     `&redirect_uri=${encodeURIComponent(redirectUri)}`;
 
-  const completeWithCode = async (code: string, redirect: string): Promise<boolean> => {
-    const token = await exchangeNotionCode(code, redirect);
-    if (token?.accessToken) {
-      useGoalsStore.getState().setNotionToken(token.accessToken);
-      try {
-        await WebBrowser.dismissBrowser();
-      } catch {
-        /* already closed */
-      }
-      return true;
-    }
-    showNotionSetupHelp(redirectUri, 'token');
-    return false;
+  const completeWithCode = async (code: string): Promise<boolean> => {
+    const ok = await completeNotionOAuthFromCode(code);
+    if (!ok) showNotionSetupHelp(redirectUri, 'token');
+    return ok;
   };
 
   try {
     const initialUrl = await Linking.getInitialURL();
     if (initialUrl?.includes('notion-callback')) {
       const code = parseNotionAuthCode(initialUrl);
-      if (code) return completeWithCode(code, redirectUri);
+      if (code) return completeWithCode(code);
     }
   } catch {
     /* continue with browser flow */
@@ -155,7 +164,7 @@ export async function connectNotion(): Promise<boolean> {
       if (!incoming.includes('notion-callback')) return;
       const code = parseNotionAuthCode(incoming);
       if (!code) return;
-      void completeWithCode(code, redirectUri).then(finish);
+      void completeWithCode(code).then(finish);
     });
 
     void WebBrowser.openAuthSessionAsync(url, redirectUri)
@@ -165,7 +174,7 @@ export async function connectNotion(): Promise<boolean> {
         if (result.type === 'success' && result.url) {
           const code = parseNotionAuthCode(result.url);
           if (code) {
-            finish(await completeWithCode(code, redirectUri));
+            finish(await completeWithCode(code));
             return;
           }
         }
@@ -199,7 +208,7 @@ type NotionGoalsResponse = {
 
 type NotionDatabase = { id: string; title: string };
 
-function parseNotionAuthCode(returnUrl: string): string | null {
+export function parseNotionAuthCode(returnUrl: string): string | null {
   try {
     const parsed = Linking.parse(returnUrl);
     const fromLinking = parsed.queryParams?.code;
@@ -250,9 +259,37 @@ export async function syncGoalsFromNotion(databaseId?: string | null): Promise<s
 const SHORTCUT_FALLBACK = 'https://www.icloud.com/shortcuts/';
 const GOOGLE_TASKS_PACKAGE = 'com.google.android.apps.tasks';
 
-/** Opens Google Tasks on Android, or Play Store if not installed. */
+async function openGoogleTasksPlayStore(): Promise<boolean> {
+  try {
+    await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+      data: `market://details?id=${GOOGLE_TASKS_PACKAGE}`,
+      flags: 0x10000000,
+    });
+    return true;
+  } catch {
+    /* fall through */
+  }
+  try {
+    await Linking.openURL(`market://details?id=${GOOGLE_TASKS_PACKAGE}`);
+    return true;
+  } catch {
+    await Linking.openURL(`https://play.google.com/store/apps/details?id=${GOOGLE_TASKS_PACKAGE}`);
+    return true;
+  }
+}
+
+/** Opens Google Tasks on Android, or Play Store listing if not installed. */
 export async function openGoogleTasks(): Promise<boolean> {
   if (Platform.OS !== 'android') return false;
+
+  try {
+    if (HopoffDevice?.openPackage) {
+      const opened = await HopoffDevice.openPackage(GOOGLE_TASKS_PACKAGE);
+      if (opened) return true;
+    }
+  } catch {
+    /* fall through */
+  }
 
   try {
     await IntentLauncher.startActivityAsync('android.intent.action.MAIN', {
@@ -265,33 +302,13 @@ export async function openGoogleTasks(): Promise<boolean> {
   }
 
   try {
-    if (await Linking.canOpenURL('googletasks://')) {
-      await Linking.openURL('googletasks://');
-      return true;
-    }
+    await Linking.openURL('googletasks://');
+    return true;
   } catch {
     /* fall through */
   }
 
-  try {
-    if (HopoffDevice?.getInstalledPackages) {
-      const installed = await HopoffDevice.getInstalledPackages([GOOGLE_TASKS_PACKAGE]);
-      if (!installed.includes(GOOGLE_TASKS_PACKAGE)) {
-        await Linking.openURL(`market://details?id=${GOOGLE_TASKS_PACKAGE}`);
-        return true;
-      }
-    }
-  } catch {
-    /* fall through */
-  }
-
-  try {
-    await Linking.openURL(`market://details?id=${GOOGLE_TASKS_PACKAGE}`);
-    return true;
-  } catch {
-    await Linking.openURL(`https://play.google.com/store/apps/details?id=${GOOGLE_TASKS_PACKAGE}`);
-    return true;
-  }
+  return openGoogleTasksPlayStore();
 }
 
 export async function openShortcut(serviceId: string): Promise<void> {

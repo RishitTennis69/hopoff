@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { Linking, Modal, Pressable, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Linking, Modal, Pressable, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { AppIcon } from './AppIcon';
@@ -7,18 +7,9 @@ import { AppText } from './AppText';
 import { MotivationVideo } from './MotivationVideo';
 import { PillButton } from './PillButton';
 import type { VideoItem } from '@/data/mock';
-import { shortLinkTitle } from '@/utils/videoDisplay';
+import { linkAuthorName, shortLinkTitle } from '@/utils/videoDisplay';
 import { thumbnailSource } from '@/utils/videoThumbnail';
 import { colors, glass, radii, spacing } from '@/theme';
-
-/** Portrait thumb proportion used in `VideoCard` (height = width × 1.15). */
-const THUMB_HEIGHT_RATIO = 1.15;
-
-function libraryCardWidth(screenW: number): number {
-  const gap = spacing.md;
-  const gridW = screenW - spacing.xl * 2;
-  return Math.floor((gridW - gap) / 2);
-}
 
 function CloseButton({ onClose }: { onClose: () => void }) {
   return (
@@ -33,8 +24,7 @@ function CloseButton({ onClose }: { onClose: () => void }) {
   );
 }
 
-function Mp4Player({ video, width }: { video: VideoItem; width: number }) {
-  const height = Math.round(width * THUMB_HEIGHT_RATIO);
+function Mp4Player({ video }: { video: VideoItem }) {
   const player = useVideoPlayer(video.videoUrl, (p) => {
     p.loop = false;
     p.muted = false;
@@ -42,11 +32,11 @@ function Mp4Player({ video, width }: { video: VideoItem; width: number }) {
   });
 
   return (
-    <View style={{ alignSelf: 'center', width, height, borderRadius: radii.lg, overflow: 'hidden' }}>
+    <View style={{ marginHorizontal: spacing.xl, borderRadius: radii.lg, overflow: 'hidden' }}>
       <VideoView
         player={player}
-        style={{ width: '100%', height: '100%' }}
-        contentFit="cover"
+        style={{ width: '100%', aspectRatio: 9 / 16, maxHeight: 520 }}
+        contentFit="contain"
         nativeControls
       />
     </View>
@@ -57,15 +47,15 @@ function PlayBadge() {
   return (
     <View
       style={{
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: 'rgba(0,0,0,0.45)',
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(0,0,0,0.5)',
         alignItems: 'center',
         justifyContent: 'center',
       }}
     >
-      <Svg width={16} height={16} viewBox="0 0 24 24">
+      <Svg width={20} height={20} viewBox="0 0 24 24">
         <Path fill="#fff" d="M8 5v14l11-7z" />
       </Svg>
     </View>
@@ -73,8 +63,6 @@ function PlayBadge() {
 }
 
 function LinkPreview({ video }: { video: VideoItem }) {
-  const { width: screenW } = useWindowDimensions();
-  const cardW = libraryCardWidth(screenW);
   const platform =
     video.source === 'instagram' || video.source === 'instagramReels'
       ? 'Instagram'
@@ -82,82 +70,71 @@ function LinkPreview({ video }: { video: VideoItem }) {
         ? 'TikTok'
         : null;
   const title = shortLinkTitle(video.title, video.author, 80);
-  const author =
-    video.author && video.author !== 'Instagram' && video.author !== 'TikTok' ? video.author : null;
+  const author = linkAuthorName(video.author);
 
   return (
-    <View style={{ alignItems: 'center', gap: spacing.lg, paddingHorizontal: spacing.xl }}>
-      <View
-        style={{
-          width: cardW,
-          backgroundColor: glass.bg,
-          borderRadius: radii.md,
-          borderWidth: 1,
-          borderColor: glass.border,
-          padding: spacing.sm,
-        }}
+    <View style={{ marginHorizontal: spacing.xl, alignItems: 'center', gap: spacing.lg }}>
+      <Pressable
+        onPress={() => !video.pending && Linking.openURL(video.videoUrl)}
+        style={{ width: '100%', alignItems: 'center' }}
+        disabled={video.pending}
       >
-        <Pressable onPress={() => Linking.openURL(video.videoUrl)}>
-          <View
-            style={{
-              width: '100%',
-              aspectRatio: 1 / THUMB_HEIGHT_RATIO,
-              borderRadius: radii.sm,
-              backgroundColor: video.thumbnailUrl ? glass.bg : 'rgba(255,255,255,0.07)',
-              alignItems: 'center',
-              justifyContent: 'center',
-              overflow: 'hidden',
-            }}
-          >
-            {video.thumbnailUrl ? (
-              <Image
-                source={thumbnailSource(video.thumbnailUrl, video.source)}
-                style={{ position: 'absolute', width: '100%', height: '100%' }}
-                contentFit="cover"
-              />
-            ) : (
-              <AppIcon brandKey={video.source} size={48} />
-            )}
-            <PlayBadge />
-          </View>
-        </Pressable>
-        <View style={{ marginTop: spacing.sm, gap: 4, paddingHorizontal: 2 }}>
-          <AppText variant="small" color={colors.text} numberOfLines={2}>
-            {title}
-          </AppText>
-          {author ? (
-            <AppText variant="bodyRegular" color={colors.textMuted} numberOfLines={1} style={{ fontSize: 15 }}>
-              {author}
-            </AppText>
-          ) : null}
+        <View
+          style={{
+            width: '100%',
+            aspectRatio: 9 / 16,
+            maxHeight: 480,
+            borderRadius: radii.lg,
+            overflow: 'hidden',
+            backgroundColor: video.thumbnailUrl ? glass.bg : 'rgba(255,255,255,0.07)',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {video.pending ? (
+            <ActivityIndicator color={colors.text} size="large" />
+          ) : video.thumbnailUrl ? (
+            <Image
+              source={thumbnailSource(video.thumbnailUrl, video.source)}
+              style={{ position: 'absolute', width: '100%', height: '100%' }}
+              contentFit="cover"
+            />
+          ) : (
+            <AppIcon brandKey={video.source} size={72} />
+          )}
+          {!video.pending ? <PlayBadge /> : null}
         </View>
+      </Pressable>
+      <View style={{ alignSelf: 'stretch', gap: spacing.xs, alignItems: 'center' }}>
+        <AppText variant="subheading" center>
+          {video.pending ? 'Video being added…' : title}
+        </AppText>
+        {!video.pending && author ? (
+          <AppText variant="small" color={colors.textMuted} center>
+            {author}
+          </AppText>
+        ) : null}
       </View>
       {platform ? (
-        <View style={{ width: cardW }}>
-          <PillButton
-            label={`Open in ${platform}`}
-            onPress={() => Linking.openURL(video.videoUrl)}
-            fullWidth
-          />
-        </View>
+        <PillButton
+          label={`Open in ${platform}`}
+          onPress={() => Linking.openURL(video.videoUrl)}
+          fullWidth
+        />
       ) : null}
     </View>
   );
 }
 
 function Body({ video }: { video: VideoItem }) {
-  const { width: screenW } = useWindowDimensions();
-  const cardW = libraryCardWidth(screenW);
-  const videoH = Math.round(cardW * THUMB_HEIGHT_RATIO);
-
   if (video.kind === 'youtube' && video.youtubeId) {
     return (
-      <View style={{ alignItems: 'center', paddingHorizontal: spacing.xl }}>
+      <View style={{ marginHorizontal: spacing.xl }}>
         <MotivationVideo
           youtubeId={video.youtubeId}
           muted={false}
           loop={false}
-          style={{ width: cardW, height: videoH, alignSelf: 'center' }}
+          style={{ maxHeight: 520, alignSelf: 'center' }}
         />
       </View>
     );
@@ -167,7 +144,7 @@ function Body({ video }: { video: VideoItem }) {
     return <LinkPreview video={video} />;
   }
 
-  return <Mp4Player video={video} width={cardW} />;
+  return <Mp4Player video={video} />;
 }
 
 type Props = {

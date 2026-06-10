@@ -3,6 +3,7 @@ const { withAndroidManifest } = require('@expo/config-plugins');
 const PACKAGES = [
   'com.twitter.android',
   'com.zhiliaoapp.musically',
+  'com.ss.android.ugc.trill',
   'com.google.android.youtube',
   'com.instagram.android',
   'com.snapchat.android',
@@ -22,6 +23,7 @@ const SCHEMES = [
   'reddit',
   'fb',
   'googletasks',
+  'market',
 ];
 
 /** Android 11+ visibility for installed-app detection (packages + URL schemes). */

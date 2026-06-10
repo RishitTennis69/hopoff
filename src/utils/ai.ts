@@ -56,22 +56,89 @@ async function chat(system: string, user: string): Promise<string | null> {
   }
 }
 
+/** True when scraped social text reads like a bio/wiki blurb, not a clip title. */
+export function looksLikeSocialBio(text: string): boolean {
+  const t = text.trim();
+  if (t.length > 100) return true;
+  return (
+    /\bborn\b/i.test(t) ||
+    /\bon\s+(january|february|march|april|may|june|july|august|september|october|november|december|\d)/i.test(t) ||
+    /\b\d{4}\b/.test(t) && /\bat\s+[A-Z]/i.test(t) ||
+    /^(christopher|born|full name|biography)/i.test(t)
+  );
+}
+
+function localSocialTitleFallback(raw: string, author?: string): string {
+  const first = raw.split(/[.!?]\s/)[0]?.trim() || raw.trim();
+  const words = first.split(/\s+/).filter(Boolean);
+  if (words.length <= 10 && !looksLikeSocialBio(first)) return first;
+
+  if (author?.replace(/^@/, '').trim() && author !== 'Instagram' && author !== 'TikTok') {
+    return 'Motivational reel';
+  }
+
+  const short = words.slice(0, 8).join(' ');
+  return short.length > 6 ? short : raw.slice(0, 48).trim();
+}
+
+/** Turn a long Instagram/TikTok caption into a short library label via OpenRouter. */
+export async function summarizeSocialVideoTitle(
+  rawTitle: string,
+  author?: string,
+  platform: 'instagram' | 'tiktok' = 'instagram',
+): Promise<string> {
+  const trimmed = rawTitle.trim();
+  if (!trimmed) return trimmed;
+
+  if (trimmed.length <= 50 && !looksLikeSocialBio(trimmed)) {
+    return trimmed;
+  }
+
+  if (!hasAiKey()) {
+    return localSocialTitleFallback(trimmed, author);
+  }
+
+  const result = await chat(
+    `You label saved motivation clips in a personal video library app.
+
+Rules:
+- Return ONE short label only (typically 3–8 words; up to 12 if needed for clarity).
+- Describe what the clip IS — e.g. "Motivational gym edit", "Morning discipline reel".
+- Do NOT write biographies, birth dates, places, or Wikipedia-style intros.
+- The creator handle is shown separately below the title — do NOT repeat the creator's name or @handle in the label.
+- Only name a person in the label if they are the subject of the clip and not the posting creator.
+- Never invent facts, quotes, or details not implied by the caption.
+- No hashtags, no "on Instagram/TikTok", no platform names, no quotes in output.
+- If the caption is already a good short title (under ~50 chars, not biographical), return it lightly cleaned.
+- Output only the label.`,
+    `Platform: ${platform}\nAuthor/handle: ${author?.trim() || 'unknown'}\nCaption:\n${trimmed}`,
+  );
+
+  if (!result) return localSocialTitleFallback(trimmed, author);
+
+  const label = result
+    .replace(/^["']|["']$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return label.length > 2 ? label : localSocialTitleFallback(trimmed, author);
+}
+
 /** Polish a messy goals brain-dump into a short weekly list. Falls back to local rules. */
 export async function polishGoalsWithAi(raw: string): Promise<string> {
   const trimmed = raw.trim();
   if (!trimmed) return '';
 
   const result = await chat(
-    `You are a focus coach for a screen-time reduction app. Rewrite a messy voice brain-dump into a tight weekly goals list.
+    `You clean up a messy voice/text brain-dump of weekly goals for a screen-time app. You are an EDITOR, not a coach.
 
-Rules:
-- Return 3–5 goals, one per line, no numbers or bullets
-- Start each line with a strong verb (Train, Read, Finish, Call, etc.)
-- Merge duplicates; drop filler and vague wishes
-- Make goals concrete: add cadence or scope when implied ("gym" → "Train 3x this week")
-- Edit for clarity: fix grammar, shorten run-ons, consistent sentence case
-- No trailing periods; max 10 words per line
-- Never invent goals the user did not imply`,
+Absolute rules:
+- Only rewrite what the user actually wrote. NEVER add new goals, topics, activities, names, numbers, or details they did not state.
+- Do NOT invent specifics: if they did not give a number/frequency/scope, do not add one (no "3x", no "this week", no targets they didn't say).
+- Keep every distinct goal the user mentioned; only merge clear duplicates of the same goal.
+- Fix grammar, remove filler words, and tighten run-ons — but preserve their meaning and wording.
+- One goal per line, no numbers or bullets. Sentence case. No trailing periods. Max ~12 words per line.
+- Output only the cleaned goal lines, nothing else.`,
     trimmed,
   );
 
@@ -87,10 +154,20 @@ Rules:
       return s;
     });
 
-  return lines.length ? lines.slice(0, 5).join('\n') : polishBrainDump(trimmed);
+  return lines.length ? lines.slice(0, 8).join('\n') : polishBrainDump(trimmed);
 }
 
 type InsightPayload = { bullets: string[]; summary?: string };
+
+export function normalizeTimeInsightBullet(b: string): string {
+  return b
+    .replace(/^that'?s enough time to\s+/i, '')
+    .replace(/^you could('ve| have)\s+/i, '')
+    .replace(/^you could\s+/i, '')
+    .replace(/^you might\s+/i, '')
+    .replace(/\.\s*$/, '')
+    .trim();
+}
 
 /** Natural "that's enough time to" lines — hours = time wasted on limited apps. */
 export async function buildTimeInsightsWithAi(
@@ -104,15 +181,17 @@ export async function buildTimeInsightsWithAi(
   const raw = await chat(
     `You write short dashboard copy for a screen-time reduction app. Return ONLY valid JSON: {"bullets":["..."]}.
 
-Context: The user WASTED this many hours on limited apps (scrolling, etc.) — NOT time they saved or reclaimed.
+The UI already shows the heading "That's enough time to…" — each bullet MUST be only the phrase that completes that sentence.
 
 Rules:
-- 2–3 bullets max, each under 12 words
-- Frame as what they could have done with that wasted time instead (tie to their goals)
+- 2–3 bullets max, each 3–10 words
+- Each bullet is a verb phrase ONLY — e.g. "launch HopOff", "market on X", "finish your weekly reading"
+- NEVER start with "You could have", "You could", "You might", or similar
+- NEVER repeat "that's enough time to" inside a bullet
+- Tie phrases to the user's actual goals when possible
 - Never say reclaimed, saved, earned, or recovered time
-- Never praise wasting less — this is time already lost to their phone
-- No summary line, no "you had X hours", no checkmarks language
-- Plain sentence case, scannable`,
+- No periods at the end of bullets
+- Output only the JSON object`,
     `Hours wasted on limited apps this week: ${wastedHours}\nUser goals:\n${goals}`,
   );
 
@@ -123,7 +202,10 @@ Rules:
     const jsonEnd = raw.lastIndexOf('}');
     if (jsonStart < 0 || jsonEnd < 0) return fallback;
     const parsed = JSON.parse(raw.slice(jsonStart, jsonEnd + 1)) as InsightPayload;
-    const bullets = (parsed.bullets ?? []).filter(Boolean).slice(0, 3);
+    const bullets = (parsed.bullets ?? [])
+      .map(normalizeTimeInsightBullet)
+      .filter(Boolean)
+      .slice(0, 3);
     return bullets.length ? bullets : fallback;
   } catch {
     return fallback;

@@ -5,6 +5,7 @@ type OEmbed = {
   title?: string;
   author_name?: string;
   thumbnail_url?: string;
+  description?: string;
 };
 
 const UA =
@@ -53,6 +54,30 @@ function meta(html: string, prop: string): string | undefined {
   return re2.exec(html)?.[1]?.trim();
 }
 
+function parseInstagramOg(ogTitle: string, ogDescription: string): { title: string; author_name?: string } {
+  const titleRaw = decodeEntities(ogTitle);
+  const descRaw = decodeEntities(ogDescription);
+
+  const onInsta = titleRaw.match(/^(.+?)\s+on Instagram(?::\s*(.+))?$/i);
+  if (onInsta) {
+    const who = onInsta[1].trim();
+    const handle = who.match(/\(@([^)]+)\)/);
+    const author_name =
+      handle?.[1] || who.replace(/^@/, '').replace(/\s*\(@[^)]+\)/, '').trim() || undefined;
+    const captionFromTitle = onInsta[2]?.replace(/^["']|["']$/g, '').trim();
+
+    // Prefer explicit caption after "on Instagram:"; fall back to description.
+    const title = captionFromTitle || descRaw || who.replace(/\s*\(@[^)]+\)/, '').trim() || titleRaw;
+    return { title, author_name };
+  }
+
+  if (descRaw && (!titleRaw || titleRaw.length < 8)) {
+    return { title: descRaw };
+  }
+
+  return { title: titleRaw || descRaw, author_name: undefined };
+}
+
 /** Scrape Open Graph tags — works for many public Instagram/TikTok posts. */
 async function scrapeOpenGraph(pageUrl: string): Promise<OEmbed | null> {
   const res = await fetch(pageUrl, {
@@ -61,24 +86,27 @@ async function scrapeOpenGraph(pageUrl: string): Promise<OEmbed | null> {
   });
   if (!res.ok) return null;
   const html = await res.text();
-  const ogTitle = decodeEntities(meta(html, 'og:title') ?? '');
+  const ogTitle = meta(html, 'og:title') ?? '';
+  const ogDescription = meta(html, 'og:description') ?? '';
   const thumbnail_url = absolutizeUrl(pageUrl, meta(html, 'og:image'));
-  let title = ogTitle;
+
+  const isInsta = /instagram\.com/i.test(pageUrl);
+  let title = decodeEntities(ogTitle);
   let author_name = decodeEntities(meta(html, 'og:site_name') ?? '');
 
-  const onInsta = ogTitle.match(/^(.+?)\s+on Instagram(?::\s*(.+))?$/i);
-  if (onInsta) {
-    const who = onInsta[1].trim();
-    const handle = who.match(/\(@([^\)]+)\)/);
-    author_name = handle?.[1] || who.replace(/^@/, '') || author_name;
-    const caption = onInsta[2]?.replace(/^["']|["']$/g, '').trim();
-    title = caption || who.replace(/\s*\(@[^)]+\)/, '').trim() || ogTitle;
+  if (isInsta) {
+    const parsed = parseInstagramOg(ogTitle, ogDescription);
+    title = parsed.title;
+    author_name = parsed.author_name || author_name;
+  } else if (!title && ogDescription) {
+    title = decodeEntities(ogDescription);
   }
 
   if (!title && !thumbnail_url) return null;
   return {
     title: title || undefined,
     author_name: author_name || undefined,
+    description: ogDescription ? decodeEntities(ogDescription) : undefined,
     thumbnail_url,
   };
 }

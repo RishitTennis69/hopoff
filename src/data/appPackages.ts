@@ -8,6 +8,7 @@ export type AppPlatformRef = {
 export const APP_PLATFORM_REFS: AppPlatformRef[] = [
   { id: 'twitter', androidPackage: 'com.twitter.android', iosScheme: 'twitter' },
   { id: 'tiktok', androidPackage: 'com.zhiliaoapp.musically', iosScheme: 'tiktok' },
+  { id: 'tiktok', androidPackage: 'com.ss.android.ugc.trill' },
   { id: 'youtube', androidPackage: 'com.google.android.youtube', iosScheme: 'youtube' },
   { id: 'youtube_shorts', androidPackage: 'com.google.android.youtube', iosScheme: 'youtube' },
   { id: 'instagram', androidPackage: 'com.instagram.android', iosScheme: 'instagram' },

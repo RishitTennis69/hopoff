@@ -18,24 +18,12 @@ function matchEstimate(goal: string): TaskEstimate | null {
   return ESTIMATES.find((e) => e.keywords.some((k) => lower.includes(k))) ?? null;
 }
 
-function formatHours(h: number) {
-  const rounded = Math.round(h * 2) / 2;
-  if (rounded < 1) return `${Math.round(rounded * 60)} min`;
-  if (rounded === 1) return '1 hr';
-  if (Number.isInteger(rounded)) return `${rounded} hrs`;
-  return `${rounded} hrs`;
-}
-
-function roundHalf(h: number) {
-  return Math.round(h * 2) / 2;
-}
-
 function cleanGoal(goal: string) {
   return goal.replace(/^[•\-\d.]+\s*/, '').replace(/\.$/, '').trim();
 }
 
 /** Build 2–3 short goal bullets from hours wasted on limited apps. */
-export function buildTimeInsights(goalsText: string, wastedHours: number): string[] {
+export function buildTimeInsights(goalsText: string, _wastedHours: number): string[] {
   const goals = goalsText
     .split(/\n|,/)
     .map(cleanGoal)
@@ -44,25 +32,41 @@ export function buildTimeInsights(goalsText: string, wastedHours: number): strin
 
   if (!goals.length) {
     return [
-      `${formatHours(wastedHours)} you could've spent on deep work`,
-      'One habit you keep putting off',
+      'make progress on deep work',
+      'finish a habit you keep putting off',
     ];
   }
 
-  const items = goals.map((goal) => ({
-    goal,
-    ideal: matchEstimate(goal)?.hours ?? wastedHours / goals.length,
-  }));
+  return goals.map((goal) => phraseForTimeInsight(goal));
+}
 
-  const idealTotal = items.reduce((s, i) => s + i.ideal, 0);
-  const scale = idealTotal > wastedHours ? wastedHours / idealTotal : 1;
+/** Verb phrase that completes the dashboard line "That's enough time to…" */
+export function phraseForTimeInsight(goal: string): string {
+  const g = cleanGoal(goal);
+  if (!g) return 'make progress on something that matters';
 
-  let allocated = items.map((i) => roundHalf(i.ideal * scale));
+  const est = matchEstimate(g);
+  if (est) {
+    const map: Record<string, string> = {
+      calligraphy: 'practice calligraphy',
+      reading: 'finish reading',
+      'a workout': 'get a workout in',
+      'project work': 'work on your project',
+      studying: 'study',
+      cooking: 'cook a real meal',
+      'quiet time': 'take quiet time',
+      writing: 'write',
+      practice: 'practice',
+      'tidying up': 'tidy up',
+    };
+    if (map[est.label]) return map[est.label];
+  }
 
-  return items.slice(0, 3).map((item, i) => {
-    const hrs = allocated[i];
-    const est = matchEstimate(item.goal);
-    if (est) return `${item.goal} — ${formatHours(hrs)} for ${est.label}`;
-    return `${item.goal} — ${formatHours(hrs)}`;
-  });
+  const words = g.split(/\s+/);
+  const short = words.length > 8 ? words.slice(0, 7).join(' ') : g;
+  const first = short.charAt(0);
+  if (first === first.toUpperCase() && first !== first.toLowerCase()) {
+    return short;
+  }
+  return short.charAt(0).toLowerCase() + short.slice(1);
 }

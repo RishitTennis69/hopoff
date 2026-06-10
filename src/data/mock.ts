@@ -38,6 +38,8 @@ export type VideoItem = {
   kind?: VideoKind;
   youtubeId?: string;
   thumbnailUrl?: string;
+  /** True while a freshly shared video is still loading its metadata. */
+  pending?: boolean;
 };
 
 export const WELCOME_YOUTUBE_ID = 'D5SyEe5oGZU';

@@ -9,6 +9,7 @@ type VideoState = {
   seeded: boolean;
   libraryCustomized: boolean;
   addVideo: (v: VideoItem) => boolean;
+  addVideoToTop: (v: VideoItem) => boolean;
   updateVideo: (v: VideoItem) => void;
   removeVideo: (id: string) => void;
   addMany: (vids: VideoItem[]) => void;
@@ -27,6 +28,12 @@ export const useVideoStore = create<VideoState>()(
         const exists = get().added.some((x) => x.id === v.id);
         if (exists) return false;
         set((s) => ({ added: [...s.added, v], libraryCustomized: true }));
+        return true;
+      },
+      addVideoToTop: (v) => {
+        const exists = get().added.some((x) => x.id === v.id);
+        if (exists) return false;
+        set((s) => ({ added: [v, ...s.added], libraryCustomized: true }));
         return true;
       },
       updateVideo: (v) =>

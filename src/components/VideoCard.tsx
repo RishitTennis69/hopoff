@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Pressable, View } from 'react-native';
+import { ActivityIndicator, Animated, Pressable, View } from 'react-native';
 import { Image } from 'expo-image';
 import Svg, { Path } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
@@ -7,7 +7,7 @@ import { AppText } from './AppText';
 import { CheckCircle } from './CheckCircle';
 import type { VideoItem } from '@/data/mock';
 import { isDisplayDuration } from '@/utils/videoDuration';
-import { shortLinkTitle } from '@/utils/videoDisplay';
+import { linkAuthorName, shortLinkTitle } from '@/utils/videoDisplay';
 import { thumbnailSource } from '@/utils/videoThumbnail';
 import { colors, glass, radii, spacing } from '@/theme';
 
@@ -90,9 +90,9 @@ export function VideoCard({
 }: Props) {
   const dark = variant === 'dark';
   const thumbH = width * 1.15;
-  const title =
-    video.kind === 'link' ? shortLinkTitle(video.title, video.author, 36) : video.title;
-  const author = video.author;
+  const isLink = video.kind === 'link';
+  const title = isLink ? shortLinkTitle(video.title, video.author, 36) : video.title;
+  const author = isLink ? linkAuthorName(video.author) : video.author;
   const pulse = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -108,6 +108,38 @@ export function VideoCard({
     Haptics.selectionAsync();
     onToggle();
   };
+
+  if (video.pending) {
+    return (
+      <Animated.View
+        style={{
+          width,
+          backgroundColor: dark ? glass.bg : colors.card,
+          borderRadius: radii.md,
+          borderWidth: dark ? 1 : 0,
+          borderColor: glass.border,
+          padding: spacing.sm,
+        }}
+      >
+        <View
+          style={{
+            height: thumbH,
+            borderRadius: radii.sm,
+            backgroundColor: dark ? 'rgba(255,255,255,0.07)' : colors.cardSubtle,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <ActivityIndicator color={dark ? colors.text : colors.cardText} />
+        </View>
+        <View style={{ marginTop: spacing.sm }}>
+          <AppText variant="small" color={dark ? colors.text : colors.cardText} numberOfLines={1}>
+            Video being added…
+          </AppText>
+        </View>
+      </Animated.View>
+    );
+  }
 
   return (
     <Animated.View

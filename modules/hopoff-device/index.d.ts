@@ -25,6 +25,7 @@ type HopoffDeviceNative = {
   clearMonitoredApps(): Promise<void>;
   openUsageAccessSettings(): Promise<void>;
   openAccessibilitySettings(): Promise<void>;
+  openPackage(packageName: string): Promise<boolean>;
   queryUsageByDay(packages: string[], days: number): Promise<UsageRow[]>;
   addListener(event: 'onLimitExceeded', listener: (event: LimitExceededEvent) => void): EventSubscription;
 };

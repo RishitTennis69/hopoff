@@ -1,5 +1,5 @@
-import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, View, TextInput } from 'react-native';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, View, TextInput } from 'react-native';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { AppIcon } from '@/components/AppIcon';
 import { AppText } from '@/components/AppText';
@@ -101,8 +101,10 @@ export const GoalsEditor = forwardRef<GoalsEditorHandle, GoalsEditorProps>(funct
     setGoals,
     connected,
     toggleConnected,
+    notionAccessToken,
     notionDatabaseId,
     setNotionDatabaseId,
+    setNotionToken,
   } = useGoalsStore();
   const rawDump = useRef('');
   const [polishing, setPolishing] = useState(false);
@@ -111,8 +113,23 @@ export const GoalsEditor = forwardRef<GoalsEditorHandle, GoalsEditorProps>(funct
   const [notionDatabases, setNotionDatabases] = useState<{ id: string; title: string }[]>([]);
   const [importingNotion, setImportingNotion] = useState(false);
 
+  useEffect(() => {
+    if (!notionAccessToken) return;
+    void fetchNotionDatabases().then((dbs) => {
+      setNotionDatabases(dbs);
+      if (dbs.length === 1 && !useGoalsStore.getState().notionDatabaseId) {
+        setNotionDatabaseId(dbs[0].id);
+      }
+    });
+  }, [notionAccessToken, setNotionDatabaseId]);
+
   const handleConnect = async (service: ConnectService) => {
     if (connected.includes(service.id)) {
+      if (service.id === 'notion') {
+        setNotionToken(null);
+        setNotionDatabaseId(null);
+        setNotionDatabases([]);
+      }
       toggleConnected(service.id);
       return;
     }
@@ -124,6 +141,12 @@ export const GoalsEditor = forwardRef<GoalsEditorHandle, GoalsEditorProps>(funct
         const dbs = await fetchNotionDatabases();
         setNotionDatabases(dbs);
         if (dbs.length === 1) setNotionDatabaseId(dbs[0].id);
+        if (dbs.length === 0) {
+          Alert.alert(
+            'Notion connected',
+            'Share a goals database with your HopOff integration in Notion (••• → Connections), then pick it below to import.',
+          );
+        }
       }
       setConnectingId(null);
       return;
@@ -131,7 +154,13 @@ export const GoalsEditor = forwardRef<GoalsEditorHandle, GoalsEditorProps>(funct
     if (service.method === 'intent' && service.id === 'google_tasks') {
       const opened = await openGoogleTasks();
       setConnectingId(null);
-      if (opened) toggleConnected(service.id);
+      if (opened) {
+        Alert.alert(
+          'Google Tasks',
+          'HopOff opened Google Tasks. Task import is not wired yet — copy tasks into your goals list above. Notion can import automatically.',
+        );
+        toggleConnected(service.id);
+      }
       return;
     }
     await openShortcut(service.id);
@@ -179,7 +208,14 @@ export const GoalsEditor = forwardRef<GoalsEditorHandle, GoalsEditorProps>(funct
     if (!notionDatabaseId) return;
     setImportingNotion(true);
     const imported = await syncGoalsFromNotion(notionDatabaseId);
-    if (imported) setGoals(imported);
+    if (imported) {
+      setGoals(imported);
+    } else {
+      Alert.alert(
+        'Notion import',
+        'Could not import goals. In Notion, share a database with your HopOff integration, then pick it below.',
+      );
+    }
     setImportingNotion(false);
   };
 
@@ -302,7 +338,7 @@ export const GoalsEditor = forwardRef<GoalsEditorHandle, GoalsEditorProps>(funct
         ))}
       </View>
 
-      {connected.includes('notion') && notionDatabases.length > 0 ? (
+      {(notionAccessToken || connected.includes('notion')) && notionDatabases.length > 0 ? (
         <View style={{ marginTop: spacing.lg, gap: spacing.sm }}>
           <AppText variant="caption" color={colors.textMuted}>
             Choose a Notion database to import

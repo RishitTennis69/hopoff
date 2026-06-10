@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { PillButton } from '@/components/PillButton';
 import { OnboardingScreen } from '@/features/OnboardingScreen';
@@ -10,10 +10,15 @@ export default function OnboardingGoals() {
   const editorRef = useRef<GoalsEditorHandle>(null);
   const [polishing, setPolishing] = useState(false);
   const goalsText = useGoalsStore((s) => s.goalsText);
-  const goalsPolished = useGoalsStore((s) => s.goalsPolished);
   const hasGoals = goalsText.trim().length > 0;
+  const [polishedThisSession, setPolishedThisSession] = useState(false);
+  const canContinue = hasGoals && polishedThisSession;
 
-  const footer = goalsPolished ? (
+  useEffect(() => {
+    if (!hasGoals) setPolishedThisSession(false);
+  }, [hasGoals]);
+
+  const footer = canContinue ? (
     <PillButton label="Continue" onPress={() => router.push('/onboarding/videos')} fullWidth />
   ) : (
     <PillButton
@@ -21,6 +26,9 @@ export default function OnboardingGoals() {
       onPress={async () => {
         setPolishing(true);
         await editorRef.current?.polish();
+        if (useGoalsStore.getState().goalsText.trim()) {
+          setPolishedThisSession(true);
+        }
         setPolishing(false);
       }}
       disabled={!hasGoals}

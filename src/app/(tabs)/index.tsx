@@ -20,7 +20,7 @@ import {
   computeWeekStats,
   useUsageStore,
 } from '@/store/usageStore';
-import { buildTimeInsightsWithAi } from '@/utils/ai';
+import { buildTimeInsightsWithAi, normalizeTimeInsightBullet } from '@/utils/ai';
 import { buildTimeInsights } from '@/utils/goalInsights';
 import { useAppsStore } from '@/store/appsStore';
 import { resetApp } from '@/utils/resetApp';
@@ -51,11 +51,13 @@ export default function Dashboard() {
       return;
     }
     let cancelled = false;
-    const fallback = buildTimeInsights(goalsText, weekHours);
+    const fallback = buildTimeInsights(goalsText, weekHours).map(normalizeTimeInsightBullet);
     setBullets(fallback);
 
     buildTimeInsightsWithAi(goalsText, weekHours).then((ai) => {
-      if (!cancelled && ai.length) setBullets(ai);
+      if (!cancelled && ai.length) {
+        setBullets(ai.map(normalizeTimeInsightBullet).filter(Boolean));
+      }
     });
 
     return () => {

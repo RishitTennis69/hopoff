@@ -22,7 +22,17 @@ function pickRandomVideo(library: VideoItem[]): VideoItem {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-function Mp4Frame({ video, onWatched }: { video: VideoItem; onWatched: () => void }) {
+function Mp4Frame({
+  video,
+  minWatchSec,
+  onWatched,
+}: {
+  video: VideoItem;
+  minWatchSec: number;
+  onWatched: (watchedSec: number) => void;
+}) {
+  const maxWatched = useRef(0);
+  const done = useRef(false);
   const player = useVideoPlayer(video.videoUrl, (p) => {
     p.loop = false;
     p.muted = false;
@@ -30,16 +40,33 @@ function Mp4Frame({ video, onWatched }: { video: VideoItem; onWatched: () => voi
   });
 
   useEffect(() => {
-    const sub = player.addListener('playToEnd', onWatched);
-    return () => sub.remove();
-  }, [player, onWatched]);
+    const id = setInterval(() => {
+      const t = player.currentTime;
+      if (t > maxWatched.current) maxWatched.current = t;
+    }, 400);
+    const end = player.addListener('playToEnd', () => {
+      if (done.current) return;
+      if (maxWatched.current < minWatchSec) {
+        player.currentTime = 0;
+        player.play();
+        return;
+      }
+      done.current = true;
+      onWatched(Math.round(maxWatched.current));
+    });
+    return () => {
+      clearInterval(id);
+      end.remove();
+    };
+  }, [player, minWatchSec, onWatched]);
 
   return (
     <VideoView
       player={player}
       style={{ width: '100%', aspectRatio: 9 / 16 }}
       contentFit="cover"
-      nativeControls
+      nativeControls={false}
+      pointerEvents="none"
     />
   );
 }
@@ -57,6 +84,8 @@ export function BlockVideoFrame({ onWatched }: Props) {
   const video = videoRef.current;
   const durationSec = parseDurationLabel(video.duration);
   const fallbackSec = durationSec > 0 ? durationSec : 45;
+  const minWatchSec = Math.max(1, Math.floor(fallbackSec * 0.85));
+
   const handleWatched = () => onWatched(fallbackSec);
 
   return (
@@ -81,7 +110,7 @@ export function BlockVideoFrame({ onWatched }: Props) {
           onWatched={handleWatched}
         />
       ) : video.videoUrl ? (
-        <Mp4Frame video={video} onWatched={handleWatched} />
+        <Mp4Frame video={video} minWatchSec={minWatchSec} onWatched={onWatched} />
       ) : (
         <MotivationVideo
           youtubeId={DEFAULT_LIBRARY[0].youtubeId!}

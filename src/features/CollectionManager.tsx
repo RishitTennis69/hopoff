@@ -103,10 +103,11 @@ export function CollectionManager({ onSelectModeChange }: Props = {}) {
     const generic = /^(Instagram|TikTok)\s+(reel|clip|post|video)/i;
     for (const v of added) {
       if (v.kind !== 'link' || !v.videoUrl || enrichedLinkIds.current.has(v.id)) continue;
-      const needsMeta = !v.thumbnailUrl || generic.test(v.title) || !v.author;
+      const needsMeta =
+        v.pending || !v.thumbnailUrl || generic.test(v.title) || !v.author;
       if (!needsMeta) continue;
       enrichedLinkIds.current.add(v.id);
-      enrichVideoMetadata(v).then((enriched) => updateVideo(enriched));
+      enrichVideoMetadata(v).then((enriched) => updateVideo({ ...enriched, pending: false }));
     }
   }, [added, updateVideo]);
 
@@ -175,7 +176,7 @@ export function CollectionManager({ onSelectModeChange }: Props = {}) {
       addVideo(v);
       setFlashId(v.id);
       setTimeout(() => setFlashId(null), 400);
-      showToast(formatSavedLabel(v.title, v.source));
+      showToast(formatSavedLabel(v.title, v.source, v.author));
     }
   };
 
@@ -336,10 +337,11 @@ export function CollectionManager({ onSelectModeChange }: Props = {}) {
               active={isSelectMode ? selected.has(v.id) : isAdded(v.id)}
               flashAdd={flashId === v.id}
               onPlay={() => {
+                if (v.pending) return;
                 setPlaying(v);
                 if (v.kind === 'link') {
                   enrichVideoMetadata(v).then((enriched) => {
-                    updateVideo(enriched);
+                    updateVideo({ ...enriched, pending: false });
                     setPlaying(enriched);
                   });
                 }

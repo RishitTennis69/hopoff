@@ -70,7 +70,12 @@ export async function detectInstalledCatalogApps(): Promise<string[]> {
     try {
       if (Platform.OS === 'android' && HopoffDevice.getInstalledPackages) {
         const packages = await HopoffDevice.getInstalledPackages(androidPackages());
-        for (const id of appIdsForInstalledPackages(packages)) ids.add(id);
+        const fromPkgs = appIdsForInstalledPackages(packages);
+        if (__DEV__) {
+          console.log('[apps] native packages found:', packages);
+          console.log('[apps] mapped from packages:', fromPkgs);
+        }
+        for (const id of fromPkgs) ids.add(id);
       }
       if (Platform.OS === 'ios' && HopoffDevice.getInstalledSchemes) {
         const schemes = await HopoffDevice.getInstalledSchemes(iosSchemes());
@@ -81,11 +86,24 @@ export async function detectInstalledCatalogApps(): Promise<string[]> {
     }
   }
 
-  if (Platform.OS === 'ios' || Platform.OS === 'android') {
-    for (const id of await detectViaUrlSchemes()) ids.add(id);
+  if (!HopoffDevice && __DEV__ && Platform.OS !== 'web') {
+    console.warn('[apps] HopoffDevice native module missing — rebuild dev client for installed-app detection');
   }
 
-  if (ids.size) return [...ids];
+  if (Platform.OS === 'ios' || Platform.OS === 'android') {
+    const fromSchemes = await detectViaUrlSchemes();
+    for (const id of fromSchemes) ids.add(id);
+    if (__DEV__) {
+      console.log('[apps] detected via schemes:', fromSchemes);
+    }
+  }
+
+  if (ids.size) {
+    if (__DEV__) {
+      console.log('[apps] installed catalog ids:', [...ids]);
+    }
+    return [...ids];
+  }
 
   if (Platform.OS === 'web') {
     return APP_CATALOG.map((a) => a.id);

@@ -1,7 +1,9 @@
 import type { VideoItem } from '@/data/mock';
 import { useApiProxy } from '@/config/env';
+import { summarizeSocialVideoTitle } from '@/utils/ai';
 import { ApiError, proxyGet } from '@/utils/apiClient';
 import { parseYouTubeId } from '@/utils/youtube';
+import { scrubSocialText } from '@/utils/videoDisplay';
 import { formatDuration } from '@/utils/youtubeDuration';
 
 /** Pull the first http(s) URL from share-sheet text. */
@@ -45,34 +47,84 @@ function titleFromTikTokPath(path: string): string {
   return 'TikTok clip';
 }
 
-type OEmbed = { title?: string; author_name?: string; thumbnail_url?: string };
+type OEmbed = {
+  title?: string;
+  author_name?: string;
+  thumbnail_url?: string;
+  description?: string;
+};
 
 const FETCH_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (compatible; HopOff/1.0)',
   Accept: 'application/json',
 };
 
-function parseInstagramMeta(title?: string, author?: string): { title: string; author: string } {
-  let t = title?.trim() ?? '';
-  let a = author?.trim() ?? '';
+function looksLikeBio(text: string): boolean {
+  const t = text.trim();
+  if (t.length > 100) return true;
+  return (
+    /\bborn\b/i.test(t) ||
+    /\bon\s+(january|february|march|april|may|june|july|august|september|october|november|december)/i.test(t) ||
+    (/\b\d{4}\b/.test(t) && /\bat\s+/i.test(t))
+  );
+}
 
-  const onInsta = t.match(/^(.+?)\s+on Instagram(?::\s*(.+))?$/i);
+function authorFromInstagramUrl(pageUrl: string): string | undefined {
+  try {
+    const path = new URL(pageUrl).pathname;
+    const m = path.match(/^\/([^/]+)\/(?:reel|p|tv)\//i);
+    const handle = m?.[1];
+    if (!handle || ['reel', 'p', 'tv', 'stories', 'explore'].includes(handle.toLowerCase())) {
+      return undefined;
+    }
+    return handle;
+  } catch {
+    return undefined;
+  }
+}
+
+function parseInstagramMeta(
+  title?: string,
+  author?: string,
+  description?: string,
+  pageUrl?: string,
+): { title: string; author: string } {
+  let a = author?.trim().replace(/^@/, '') ?? '';
+  const titleRaw = title?.trim() ?? '';
+  const descRaw = description?.trim() ?? '';
+
+  const onInsta = titleRaw.match(/^(.+?)\s+on Instagram(?::\s*(.+))?$/i);
+  let caption = '';
+
   if (onInsta) {
     const who = onInsta[1].trim();
-    const handle = who.match(/\(@([^\)]+)\)/);
-    a = a || handle?.[1] || who.replace(/^@/, '');
-    const caption = onInsta[2]?.replace(/^["']|["']$/g, '').trim();
-    if (caption) t = caption;
-    else if (handle) t = who.replace(/\s*\(@[^)]+\)/, '').trim() || who;
+    const handle = who.match(/\(@([^)]+)\)/);
+    if (!a) {
+      a = handle?.[1] || who.replace(/^@/, '').replace(/\s*\(@[^)]+\)/, '').trim();
+    }
+    caption = onInsta[2]?.replace(/^["']|["']$/g, '').trim() ?? '';
   }
 
-  if (!a && t.startsWith('@')) {
-    const [handle, ...rest] = t.split(/\s+/);
-    a = handle.replace('@', '');
-    if (rest.length) t = rest.join(' ').trim();
+  let t = caption;
+  if (!t) {
+    const cleanedTitle = scrubSocialText(titleRaw);
+    if (cleanedTitle && cleanedTitle.length <= 80 && !looksLikeBio(cleanedTitle)) {
+      t = cleanedTitle;
+    } else if (descRaw) {
+      t = scrubSocialText(descRaw);
+    } else {
+      t = cleanedTitle;
+    }
+  } else {
+    t = scrubSocialText(t);
   }
 
-  t = t.replace(/\s*•\s*Instagram$/i, '').trim();
+  if (!a && pageUrl) {
+    a = authorFromInstagramUrl(pageUrl) ?? '';
+  }
+
+  a = scrubSocialText(a).replace(/^@/, '').trim();
+
   return { title: t || 'Instagram reel', author: a || 'Instagram' };
 }
 
@@ -104,18 +156,24 @@ async function fetchYouTubeOEmbed(youtubeId: string): Promise<Partial<VideoItem>
   }
 }
 
-function mapLinkOEmbed(data: OEmbed, platform: 'instagram' | 'tiktok'): Partial<VideoItem> {
+function mapLinkOEmbed(
+  data: OEmbed,
+  platform: 'instagram' | 'tiktok',
+  pageUrl: string,
+): Partial<VideoItem> {
   if (platform === 'instagram') {
-    const parsed = parseInstagramMeta(data.title, data.author_name);
+    const parsed = parseInstagramMeta(data.title, data.author_name, data.description, pageUrl);
     return {
       title: parsed.title,
       author: parsed.author,
       thumbnailUrl: data.thumbnail_url,
     };
   }
+  const title = scrubSocialText(data.title?.trim() ?? '');
+  const author = scrubSocialText(data.author_name?.trim() ?? '') || 'TikTok';
   return {
-    title: data.title?.trim(),
-    author: data.author_name?.trim() || 'TikTok',
+    title: title || scrubSocialText(data.description?.trim() ?? '') || 'TikTok clip',
+    author,
     thumbnailUrl: data.thumbnail_url,
   };
 }
@@ -127,7 +185,7 @@ async function fetchLinkOEmbedFromProxy(
   if (!useApiProxy()) return {};
   try {
     const data = await proxyGet<OEmbed>('/api/oembed', { url: pageUrl });
-    return mapLinkOEmbed(data, platform);
+    return mapLinkOEmbed(data, platform, pageUrl);
   } catch (e) {
     if (__DEV__ && e instanceof ApiError) {
       console.warn('[oembed] proxy failed', pageUrl, e.status, e.message);
@@ -146,7 +204,7 @@ async function fetchLinkOEmbed(pageUrl: string, platform: 'instagram' | 'tiktok'
     try {
       const data = await fetchOEmbed(endpoint, pageUrl, platform);
       if (data.title || data.author_name || data.thumbnail_url) {
-        return mapLinkOEmbed(data, platform);
+        return mapLinkOEmbed(data, platform, pageUrl);
       }
     } catch {
       /* try next */
@@ -156,7 +214,7 @@ async function fetchLinkOEmbed(pageUrl: string, platform: 'instagram' | 'tiktok'
   try {
     const data = await fetchOEmbed('https://noembed.com/embed', pageUrl, platform);
     if (data.title || data.author_name || data.thumbnail_url) {
-      return mapLinkOEmbed(data, platform);
+      return mapLinkOEmbed(data, platform, pageUrl);
     }
   } catch {
     /* fall through */
@@ -189,10 +247,25 @@ export async function enrichVideoMetadata(video: VideoItem): Promise<VideoItem> 
 
       if (isInsta || isTikTok) {
         const meta = await fetchLinkOEmbed(video.videoUrl, isInsta ? 'instagram' : 'tiktok');
+        let title = meta.title || fallbackTitle;
+        let author = meta.author || fallbackAuthor;
+
+        if (author === 'Instagram' && isInsta) {
+          const fromUrl = authorFromInstagramUrl(video.videoUrl);
+          if (fromUrl) author = fromUrl;
+        }
+
+        const platform = isInsta ? 'instagram' : 'tiktok';
+        title = await summarizeSocialVideoTitle(title, author, platform);
+
+        if (__DEV__) {
+          console.log('[enrich]', platform, { raw: meta.title, title, author });
+        }
+
         return {
           ...video,
-          title: meta.title || fallbackTitle,
-          author: meta.author || fallbackAuthor,
+          title,
+          author,
           thumbnailUrl: meta.thumbnailUrl ?? video.thumbnailUrl,
         };
       }

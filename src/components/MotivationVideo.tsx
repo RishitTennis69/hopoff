@@ -18,18 +18,26 @@ type Props = {
   hideChrome?: boolean;
 };
 
-function youtubePlayerHtml(id: string, muted: boolean, loop: boolean, hideChrome: boolean) {
+function youtubePlayerHtml(
+  id: string,
+  muted: boolean,
+  loop: boolean,
+  hideChrome: boolean,
+  durationSec?: number,
+) {
   const mute = muted ? 1 : 0;
   const loopFlag = loop ? 1 : 0;
   const controls = hideChrome ? 0 : 1;
+  const strictWatch = hideChrome && !loop && durationSec && durationSec > 0 ? 1 : 0;
+  const minWatchSec = strictWatch ? Math.max(1, Math.floor(durationSec! * 0.85)) : 0;
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
   <style>
     * { margin: 0; padding: 0; }
-    html, body { width: 100%; height: 100%; background: #000; overflow: hidden; }
-    #player { width: 100%; height: 100%; background: #000; }
+    html, body { width: 100%; height: 100%; background: #000; overflow: hidden; touch-action: none; }
+    #player { width: 100%; height: 100%; background: #000; pointer-events: none; }
   </style>
 </head>
 <body>
@@ -37,6 +45,9 @@ function youtubePlayerHtml(id: string, muted: boolean, loop: boolean, hideChrome
   <script src="https://www.youtube.com/iframe_api"></script>
   <script>
     var player;
+    var maxTime = 0;
+    var strict = ${strictWatch};
+    var minWatch = ${minWatchSec};
     function post(msg) {
       if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(msg);
     }
@@ -60,10 +71,28 @@ function youtubePlayerHtml(id: string, muted: boolean, loop: boolean, hideChrome
         events: {
           onReady: function() { player.playVideo(); },
           onStateChange: function(e) {
-            if (e.data === YT.PlayerState.ENDED) post('ended');
+            if (e.data === YT.PlayerState.ENDED) {
+              if (strict && maxTime < minWatch) {
+                player.seekTo(0);
+                player.playVideo();
+                return;
+              }
+              post('ended');
+            }
           },
         },
       });
+      if (strict) {
+        setInterval(function() {
+          if (!player || !player.getCurrentTime) return;
+          var t = player.getCurrentTime();
+          if (t > maxTime + 1.5) {
+            player.seekTo(maxTime, true);
+            return;
+          }
+          if (t > maxTime) maxTime = t;
+        }, 400);
+      }
     }
   </script>
 </body>
@@ -111,6 +140,7 @@ function WebIframe({
         border: 'none',
         borderRadius: radius,
         backgroundColor: '#000',
+        pointerEvents: hideChrome ? 'none' : 'auto',
       }}
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
       allowFullScreen
@@ -123,17 +153,24 @@ function NativeEmbed({
   muted,
   loop,
   hideChrome,
+  durationSec,
   onWatched,
 }: {
   id: string;
   muted: boolean;
   loop: boolean;
   hideChrome: boolean;
+  durationSec?: number;
   onWatched?: () => void;
 }) {
+  const blockTouches = hideChrome && !!onWatched && !loop;
+
   return (
     <WebView
-      source={{ html: youtubePlayerHtml(id, muted, loop, hideChrome), baseUrl: APP_REFERER_ORIGIN }}
+      source={{
+        html: youtubePlayerHtml(id, muted, loop, hideChrome, durationSec),
+        baseUrl: APP_REFERER_ORIGIN,
+      }}
       style={{ flex: 1, width: '100%', height: '100%', backgroundColor: '#000' }}
       allowsInlineMediaPlayback
       mediaPlaybackRequiresUserAction={false}
@@ -145,6 +182,7 @@ function NativeEmbed({
       showsHorizontalScrollIndicator={false}
       showsVerticalScrollIndicator={false}
       androidLayerType="hardware"
+      pointerEvents={blockTouches ? 'none' : 'auto'}
       onMessage={(e) => {
         if (e.nativeEvent.data === 'ended') onWatched?.();
       }}
@@ -169,12 +207,14 @@ export function MotivationVideo({
     onWatched();
   };
 
+  const strictBlock = hideChrome && !!onWatched && !loop;
+
   useEffect(() => {
-    if (loop || !onWatched) return;
+    if (loop || !onWatched || strictBlock) return;
     const cap = durationSec && durationSec > 0 ? durationSec + 8 : 120;
     const t = setTimeout(fire, cap * 1000);
     return () => clearTimeout(t);
-  }, [loop, onWatched, durationSec]);
+  }, [loop, onWatched, durationSec, strictBlock]);
 
   return (
     <View
@@ -188,6 +228,7 @@ export function MotivationVideo({
         !style?.height && !style?.width && { aspectRatio: 9 / 16 },
         style,
       ]}
+      pointerEvents={strictBlock ? 'box-none' : 'auto'}
     >
       {Platform.OS === 'web' ? (
         <WebIframe id={youtubeId} radius={radius} muted={muted} loop={loop} hideChrome={hideChrome} />
@@ -197,6 +238,7 @@ export function MotivationVideo({
           muted={muted}
           loop={loop}
           hideChrome={hideChrome}
+          durationSec={durationSec}
           onWatched={onWatched ? fire : undefined}
         />
       )}

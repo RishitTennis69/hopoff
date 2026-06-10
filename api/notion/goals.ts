@@ -85,6 +85,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       typeof requestedId === 'string' && databases.some((d: { id: string }) => d.id === requestedId)
         ? requestedId
         : (databases[0].id as string);
+    const selectedDb = databases.find((d: { id: string }) => d.id === databaseId);
     const { res: queryRes, data: queryData } = await notionFetch(`/databases/${databaseId}/query`, accessToken, {
       method: 'POST',
       body: JSON.stringify({ page_size: 50 }),
@@ -106,7 +107,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({
       goals,
       databaseId,
-      databaseTitle: databases[0].title?.[0]?.plain_text ?? 'Notion database',
+      databaseTitle: selectedDb?.title?.[0]?.plain_text ?? 'Notion database',
     });
   } catch {
     return res.status(502).json({ error: 'Notion upstream unavailable', code: 'upstream' });

@@ -27,5 +27,5 @@ export function polishBrainDump(raw: string): string {
     if (!unique.some((u) => u.toLowerCase() === key)) unique.push(c);
   }
 
-  return unique.slice(0, 5).join('\n');
+  return unique.slice(0, 8).join('\n');
 }
