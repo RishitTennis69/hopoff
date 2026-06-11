@@ -7,10 +7,19 @@ type Props = {
   onPress?: () => void;
   size?: number;
   onLight?: boolean;
+  /** White ring for visibility on dark thumbnails (same size, no scale). */
+  highlightRing?: boolean;
 };
 
-export function CheckCircle({ checked, onPress, size = 28, onLight = true }: Props) {
-  const ring = onLight ? colors.borderDark : colors.border;
+export function CheckCircle({ checked, onPress, size = 28, onLight = true, highlightRing = false }: Props) {
+  const ring = highlightRing
+    ? 'rgba(255,255,255,0.95)'
+    : checked
+      ? colors.text
+      : onLight
+        ? colors.borderDark
+        : colors.border;
+
   return (
     <Pressable onPress={onPress} hitSlop={10}>
       <View
@@ -19,7 +28,7 @@ export function CheckCircle({ checked, onPress, size = 28, onLight = true }: Pro
           height: size,
           borderRadius: size / 2,
           borderWidth: 2,
-          borderColor: checked ? colors.text : ring,
+          borderColor: ring,
           backgroundColor: checked ? colors.text : 'transparent',
           alignItems: 'center',
           justifyContent: 'center',

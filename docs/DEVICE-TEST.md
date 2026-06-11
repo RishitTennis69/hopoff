@@ -16,10 +16,10 @@ Open HopOff on your phone and connect to Metro (same Wi‑Fi, scan QR). Reload a
 - [ ] **Blocking** — Needs Accessibility enabled (Play Store build). Dev APK may block sideloaded apps — use skip for demo
 - [x] **Share** — Share reel/link from Instagram/TikTok/YouTube → library
 - [x] **Videos** — Search plays ≤60s clips with thumbnails
-- [ ] **Goals** — Continue only after polish; empty list shows "Polish my list" (disabled until text). Notion: `https://hopoff.vercel.app/api/notion-callback`
-- [ ] **Dashboard** — "That's enough time to…" bullets read as verb phrases (e.g. "launch HopOff"), not "You could have…"
+- [x] **Goals** — Continue only after polish; empty list shows "Polish my list" (disabled until text). Notion: `https://hopoff.vercel.app/api/notion-callback`
+- [x] **Dashboard** — "That's enough time to…" bullets read as verb phrases (e.g. "launch HopOff"), not "You could have…"
 - [x] **Instagram cards** — Title on top, gray author line below (like YouTube). Long bios → short AI labels via OpenRouter
-- [ ] **Google Tasks** — Opens app if installed; otherwise Play Store (rebuild APK for package queries)
+- [x] **Google Tasks** — Opens app if installed; otherwise Play Store (rebuild APK for package queries)
 - [x] **Onboarding paywall** — 7-day free starts; no subscription fine print
 - [x] **Trial paywall** — Settings → Expire trial → pricing popup (restore is in Settings only)
 - [ ] **Dashboard** — Week chart imports after **Usage access** (not Accessibility). Grant Usage access, then Continue on permissions

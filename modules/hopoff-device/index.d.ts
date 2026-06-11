@@ -18,6 +18,7 @@ type EventSubscription = { remove: () => void };
 
 type HopoffDeviceNative = {
   getInstalledPackages(packages: string[]): Promise<string[]>;
+  probeUrlSchemes(schemes: string[]): Promise<string[]>;
   getInstalledSchemes(schemes: string[]): Promise<string[]>;
   hasUsageAccess(): Promise<boolean>;
   isAccessibilityServiceEnabled(): Promise<boolean>;

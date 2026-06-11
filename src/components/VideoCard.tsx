@@ -191,7 +191,7 @@ export function VideoCard({
           ) : null}
           {mode === 'select' && (
             <View style={{ position: 'absolute', bottom: 6, right: 6 }}>
-              <CheckCircle checked={active} onPress={handleAdd} size={26} onLight={false} />
+              <CheckCircle checked={active} onPress={handleAdd} size={26} onLight={false} highlightRing />
             </View>
           )}
         </View>

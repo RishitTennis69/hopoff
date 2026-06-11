@@ -10,28 +10,21 @@ export default function OnboardingGoals() {
   const editorRef = useRef<GoalsEditorHandle>(null);
   const [polishing, setPolishing] = useState(false);
   const goalsText = useGoalsStore((s) => s.goalsText);
+  const goalsPolished = useGoalsStore((s) => s.goalsPolished);
   const hasGoals = goalsText.trim().length > 0;
-  const [polishedThisSession, setPolishedThisSession] = useState(false);
-  const canContinue = hasGoals && polishedThisSession;
+  const canContinue = hasGoals && goalsPolished && !polishing;
 
   useEffect(() => {
-    if (!hasGoals) setPolishedThisSession(false);
+    if (!hasGoals) {
+      useGoalsStore.setState({ goalsPolished: false });
+    }
   }, [hasGoals]);
 
-  const footer = canContinue ? (
-    <PillButton label="Continue" onPress={() => router.push('/onboarding/videos')} fullWidth />
-  ) : (
+  const footer = (
     <PillButton
-      label="Polish my list"
-      onPress={async () => {
-        setPolishing(true);
-        await editorRef.current?.polish();
-        if (useGoalsStore.getState().goalsText.trim()) {
-          setPolishedThisSession(true);
-        }
-        setPolishing(false);
-      }}
-      disabled={!hasGoals}
+      label="Continue"
+      onPress={() => router.push('/onboarding/videos')}
+      disabled={!canContinue}
       loading={polishing}
       fullWidth
     />
@@ -46,7 +39,13 @@ export default function OnboardingGoals() {
       onBack={() => router.back()}
       footer={footer}
     >
-      <GoalsEditor ref={editorRef} minHeight={160} hidePolishButton />
+      <GoalsEditor
+        ref={editorRef}
+        minHeight={208}
+        hidePolishButton
+        autoPolishOnBlur
+        onPolishingChange={setPolishing}
+      />
     </OnboardingScreen>
   );
 }

@@ -32,7 +32,16 @@ function Mp4Player({ video }: { video: VideoItem }) {
   });
 
   return (
-    <View style={{ marginHorizontal: spacing.xl, borderRadius: radii.lg, overflow: 'hidden' }}>
+    <View
+      style={{
+        width: '100%',
+        paddingHorizontal: spacing.xl,
+        alignItems: 'center',
+        borderRadius: radii.lg,
+        overflow: 'hidden',
+        alignSelf: 'center',
+      }}
+    >
       <VideoView
         player={player}
         style={{ width: '100%', aspectRatio: 9 / 16, maxHeight: 520 }}
@@ -129,12 +138,13 @@ function LinkPreview({ video }: { video: VideoItem }) {
 function Body({ video }: { video: VideoItem }) {
   if (video.kind === 'youtube' && video.youtubeId) {
     return (
-      <View style={{ marginHorizontal: spacing.xl }}>
+      <View style={{ width: '100%', paddingHorizontal: spacing.xl, alignItems: 'center' }}>
         <MotivationVideo
           youtubeId={video.youtubeId}
           muted={false}
           loop={false}
-          style={{ maxHeight: 520, alignSelf: 'center' }}
+          radius={radii.lg}
+          style={{ width: '100%', maxHeight: 520, alignSelf: 'center' }}
         />
       </View>
     );
@@ -158,12 +168,14 @@ export function VideoPlayerModal({ video, onClose }: Props) {
   return (
     <Modal visible={!!video} animationType="fade" transparent onRequestClose={onClose}>
       {video ? (
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center' }}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)' }}>
           <CloseButton onClose={onClose} />
-          <View style={{ paddingVertical: spacing.xxxl }}>
-            <Body video={video} />
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: spacing.xxl }}>
+            <View style={{ width: '100%', alignItems: 'center', transform: [{ translateY: -spacing.lg }] }}>
+              <Body video={video} />
+            </View>
             {!isLink ? (
-              <View style={{ marginTop: spacing.lg, paddingHorizontal: spacing.xl }}>
+              <View style={{ marginTop: spacing.lg, paddingHorizontal: spacing.xl, flexShrink: 0 }}>
                 <AppText variant="subheading" center>
                   {video.title}
                 </AppText>

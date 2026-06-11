@@ -22,7 +22,7 @@ export type DeviceSyncResult = {
 /** Extra schemes to probe on Android (package queries often block getPackageInfo). */
 const ANDROID_SCHEME_PROBES: { id: string; schemes: string[] }[] = [
   { id: 'twitter', schemes: ['twitter'] },
-  { id: 'tiktok', schemes: ['tiktok', 'snssdk1128'] },
+  { id: 'tiktok', schemes: ['tiktok', 'snssdk1128', 'musically', 'snssdk1180'] },
   { id: 'youtube', schemes: ['youtube', 'vnd.youtube'] },
   { id: 'youtube_shorts', schemes: ['youtube', 'vnd.youtube'] },
   { id: 'instagram', schemes: ['instagram'] },
@@ -40,9 +40,19 @@ async function schemeInstalled(scheme: string): Promise<boolean> {
   }
 }
 
-/** Fallback when package queries are blocked — checks if the app handles its URL scheme. */
-async function detectViaUrlSchemes(): Promise<string[]> {
+function appIdsFromDetectedSchemes(
+  probes: { id: string; schemes: string[] }[],
+  installedSchemes: Set<string>,
+): string[] {
   const ids = new Set<string>();
+  for (const { id, schemes } of probes) {
+    if (schemes.some((s) => installedSchemes.has(s))) ids.add(id);
+  }
+  return [...ids];
+}
+
+/** Checks URL schemes — native probe first on Android (uses manifest queries). */
+async function detectViaUrlSchemes(): Promise<string[]> {
   const probes =
     Platform.OS === 'android'
       ? ANDROID_SCHEME_PROBES
@@ -51,6 +61,19 @@ async function detectViaUrlSchemes(): Promise<string[]> {
           schemes: [r.iosScheme!],
         }));
 
+  const allSchemes = [...new Set(probes.flatMap((p) => p.schemes))];
+
+  if (Platform.OS === 'android' && HopoffDevice?.probeUrlSchemes) {
+    try {
+      const installed = await HopoffDevice.probeUrlSchemes(allSchemes);
+      if (__DEV__) console.log('[apps] native scheme probe:', installed);
+      return appIdsFromDetectedSchemes(probes, new Set(installed));
+    } catch {
+      /* fall through */
+    }
+  }
+
+  const ids = new Set<string>();
   for (const { id, schemes } of probes) {
     for (const scheme of schemes) {
       if (await schemeInstalled(scheme)) {
@@ -90,14 +113,13 @@ export async function detectInstalledCatalogApps(): Promise<string[]> {
     console.warn('[apps] HopoffDevice native module missing — rebuild dev client for installed-app detection');
   }
 
-  if (Platform.OS === 'ios' || Platform.OS === 'android') {
-    const fromSchemes = await detectViaUrlSchemes();
-    for (const id of fromSchemes) ids.add(id);
-    if (__DEV__) {
-      console.log('[apps] detected via schemes:', fromSchemes);
-    }
+  const fromSchemes = await detectViaUrlSchemes();
+  for (const id of fromSchemes) ids.add(id);
+  if (__DEV__) {
+    console.log('[apps] detected via schemes:', fromSchemes);
   }
 
+  // Prefer native package hits; scheme-only hits fill gaps when package visibility is partial.
   if (ids.size) {
     if (__DEV__) {
       console.log('[apps] installed catalog ids:', [...ids]);

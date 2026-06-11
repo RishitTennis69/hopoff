@@ -88,12 +88,15 @@ export type GoalsEditorHandle = {
 
 type GoalsEditorProps = {
   minHeight?: number;
-  /** Hide inline polish button (onboarding uses footer instead). */
+  /** Hide inline polish button (onboarding uses auto-polish + footer Continue). */
   hidePolishButton?: boolean;
+  /** Polish automatically when the user leaves the goals text field. */
+  autoPolishOnBlur?: boolean;
+  onPolishingChange?: (polishing: boolean) => void;
 };
 
 export const GoalsEditor = forwardRef<GoalsEditorHandle, GoalsEditorProps>(function GoalsEditor(
-  { minHeight = 220, hidePolishButton = false },
+  { minHeight = 286, hidePolishButton = false, autoPolishOnBlur = false, onPolishingChange },
   ref,
 ) {
   const {
@@ -183,21 +186,36 @@ export const GoalsEditor = forwardRef<GoalsEditorHandle, GoalsEditorProps>(funct
 
   const { listening, toggle } = useSpeechToText(onTranscript);
 
-  const handleMic = () => {
+  const handleMic = async () => {
+    const wasListening = listening;
     if (!listening) rawDump.current = '';
     toggle();
+    if (wasListening && autoPolishOnBlur) {
+      await tryAutoPolishOnBlur();
+    }
   };
 
-  const handlePolish = async () => {
+  const handlePolish = async (): Promise<boolean> => {
     const source = goalsText.trim() || rawDump.current.trim();
-    if (!source) return;
+    if (!source) return false;
     setPolishing(true);
+    onPolishingChange?.(true);
     const polished = await polishGoalsWithAi(source);
     if (polished) {
       useGoalsStore.setState({ goalsText: polished, goalsPolished: true });
     }
     setEditing(false);
     setPolishing(false);
+    onPolishingChange?.(false);
+    return !!polished;
+  };
+
+  const tryAutoPolishOnBlur = async () => {
+    setEditing(false);
+    if (!autoPolishOnBlur || polishing || listening) return;
+    const source = goalsText.trim() || rawDump.current.trim();
+    if (!source || useGoalsStore.getState().goalsPolished) return;
+    await handlePolish();
   };
 
   useImperativeHandle(ref, () => ({
@@ -221,12 +239,35 @@ export const GoalsEditor = forwardRef<GoalsEditorHandle, GoalsEditorProps>(funct
 
   const lines = goalsText.split('\n').filter(Boolean);
   const showList = lines.length > 1 && !listening && !editing;
+  const connectServices = getConnectServicesForPlatform();
 
   return (
     <View>
-      <AppText variant="subheading" style={{ marginBottom: spacing.md }}>
+      <AppText variant="subheading" style={{ marginBottom: polishing ? spacing.sm : spacing.md }}>
         What are your weekly goals?
       </AppText>
+
+      {polishing ? (
+        <View
+          style={{
+            backgroundColor: glass.bgSelected,
+            borderRadius: radii.md,
+            borderWidth: 1,
+            borderColor: glass.borderActive,
+            paddingVertical: spacing.sm,
+            paddingHorizontal: spacing.md,
+            marginBottom: spacing.sm,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.sm,
+          }}
+        >
+          <ActivityIndicator size="small" color={colors.text} />
+          <AppText variant="body" color={colors.text}>
+            Polishing your list…
+          </AppText>
+        </View>
+      ) : null}
 
       <View style={{ position: 'relative' }}>
         <View
@@ -263,7 +304,7 @@ export const GoalsEditor = forwardRef<GoalsEditorHandle, GoalsEditorProps>(funct
           <TextInput
             value={goalsText}
             onChangeText={setGoals}
-            onBlur={() => setEditing(false)}
+            onBlur={() => void tryAutoPolishOnBlur()}
             placeholder={listening ? 'Listening...' : 'Type or brain-dump here...'}
             placeholderTextColor={colors.textMuted}
             multiline
@@ -308,65 +349,68 @@ export const GoalsEditor = forwardRef<GoalsEditorHandle, GoalsEditorProps>(funct
 
       {!hidePolishButton && goalsText.trim().length > 0 && (
         <PillButton
-          label="Polish my list"
+          label="Polish My List"
           variant="dark"
-          size="compact"
           loading={polishing}
           style={{
-            marginTop: spacing.sm,
-            borderColor: colors.text,
-            borderWidth: 1,
-            paddingVertical: 10,
-            paddingHorizontal: 20,
+            marginTop: spacing.md,
+            alignSelf: 'center',
+            width: '98%',
+            backgroundColor: glass.bg,
+            borderColor: glass.borderActive,
           }}
-          onPress={handlePolish}
+          onPress={() => void handlePolish()}
         />
       )}
 
-      <AppText variant="subheading" style={{ marginTop: spacing.xxl, marginBottom: spacing.md }}>
-        Pull in your goals
-      </AppText>
-      <View style={{ gap: spacing.md }}>
-        {getConnectServicesForPlatform().map((s) => (
-          <ConnectRow
-            key={s.id}
-            service={s}
-            connected={connected.includes(s.id)}
-            busy={connectingId === s.id}
-            onPress={() => handleConnect(s)}
-          />
-        ))}
-      </View>
-
-      {(notionAccessToken || connected.includes('notion')) && notionDatabases.length > 0 ? (
-        <View style={{ marginTop: spacing.lg, gap: spacing.sm }}>
-          <AppText variant="caption" color={colors.textMuted}>
-            Choose a Notion database to import
+      {connectServices.length > 0 ? (
+        <>
+          <AppText variant="subheading" style={{ marginTop: spacing.xxl, marginBottom: spacing.md }}>
+            Pull in your goals
           </AppText>
-          {notionDatabases.map((db) => {
-            const selected = notionDatabaseId === db.id;
-            return (
-              <Pressable key={db.id} onPress={() => setNotionDatabaseId(db.id)}>
-                <GlassCard
-                  selected={selected}
-                  style={{ paddingVertical: spacing.sm, paddingHorizontal: spacing.md }}
-                >
-                  <AppText variant="body" color={selected ? colors.text : colors.textMuted}>
-                    {db.title}
-                  </AppText>
-                </GlassCard>
-              </Pressable>
-            );
-          })}
-          <PillButton
-            label="Import from Notion"
-            variant="dark"
-            size="compact"
-            disabled={!notionDatabaseId}
-            loading={importingNotion}
-            onPress={importFromNotion}
-          />
-        </View>
+          <View style={{ gap: spacing.md }}>
+            {connectServices.map((s) => (
+              <ConnectRow
+                key={s.id}
+                service={s}
+                connected={connected.includes(s.id)}
+                busy={connectingId === s.id}
+                onPress={() => handleConnect(s)}
+              />
+            ))}
+          </View>
+
+          {(notionAccessToken || connected.includes('notion')) && notionDatabases.length > 0 ? (
+            <View style={{ marginTop: spacing.lg, gap: spacing.sm }}>
+              <AppText variant="caption" color={colors.textMuted}>
+                Choose a Notion database to import
+              </AppText>
+              {notionDatabases.map((db) => {
+                const selected = notionDatabaseId === db.id;
+                return (
+                  <Pressable key={db.id} onPress={() => setNotionDatabaseId(db.id)}>
+                    <GlassCard
+                      selected={selected}
+                      style={{ paddingVertical: spacing.sm, paddingHorizontal: spacing.md }}
+                    >
+                      <AppText variant="body" color={selected ? colors.text : colors.textMuted}>
+                        {db.title}
+                      </AppText>
+                    </GlassCard>
+                  </Pressable>
+                );
+              })}
+              <PillButton
+                label="Import from Notion"
+                variant="dark"
+                size="compact"
+                disabled={!notionDatabaseId}
+                loading={importingNotion}
+                onPress={importFromNotion}
+              />
+            </View>
+          ) : null}
+        </>
       ) : null}
     </View>
   );

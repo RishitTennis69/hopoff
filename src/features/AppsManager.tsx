@@ -23,16 +23,13 @@ export function AppsManager({ editableGroups = false }: { editableGroups?: boole
   } = useAppsStore();
   const [detecting, setDetecting] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
+  const runDetection = () => {
     setDetecting(true);
-    refreshInstalledApps()
-      .finally(() => {
-        if (!cancelled) setDetecting(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+    return refreshInstalledApps().finally(() => setDetecting(false));
+  };
+
+  useEffect(() => {
+    void runDetection();
   }, []);
 
   const groupedIds = useMemo(() => groups.flatMap((g) => g.appIds), [groups]);
@@ -124,10 +121,17 @@ export function AppsManager({ editableGroups = false }: { editableGroups?: boole
           </AppText>
         ) : null}
         {!detecting && catalog.length === 0 ? (
-          <AppText variant="bodyRegular" color={colors.textMuted} center style={{ paddingVertical: spacing.md }}>
-            No supported apps detected yet. If you have YouTube or Instagram installed, reload the app — or install
-            the latest dev build so HopOff can read your app list.
-          </AppText>
+          <View style={{ alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.md }}>
+            <AppText variant="bodyRegular" color={colors.textMuted} center>
+              Only seeing YouTube? Install the latest dev APK — Android hides other apps until the native build
+              includes package visibility. Then tap Refresh.
+            </AppText>
+            <Pressable onPress={() => void runDetection()} hitSlop={8}>
+              <AppText variant="small" color={colors.text}>
+                Refresh app list
+              </AppText>
+            </Pressable>
+          </View>
         ) : null}
         {ungrouped.map((app) => (
           <SelectRow

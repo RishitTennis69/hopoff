@@ -34,7 +34,16 @@ export default function WelcomeScreen() {
         {'Stop scrolling.\nStart living.'}
       </ScreenTitle>
 
-      <View style={{ flex: 1, justifyContent: 'center', marginTop: spacing.md, marginBottom: spacing.md }}>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          marginTop: spacing.md,
+          marginBottom: spacing.md,
+          transform: [{ translateY: -spacing.xl }],
+        }}
+      >
         {videoPlaying ? (
           <MotivationVideo
             style={{ width: '100%', aspectRatio: 9 / 16, maxHeight: '88%', alignSelf: 'center' }}

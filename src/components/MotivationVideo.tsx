@@ -37,7 +37,7 @@ function youtubePlayerHtml(
   <style>
     * { margin: 0; padding: 0; }
     html, body { width: 100%; height: 100%; background: #000; overflow: hidden; touch-action: none; }
-    #player { width: 100%; height: 100%; background: #000; pointer-events: none; }
+    #player { width: 100%; height: 100%; background: #000; pointer-events: ${hideChrome ? 'none' : 'auto'}; }
   </style>
 </head>
 <body>
@@ -171,7 +171,7 @@ function NativeEmbed({
         html: youtubePlayerHtml(id, muted, loop, hideChrome, durationSec),
         baseUrl: APP_REFERER_ORIGIN,
       }}
-      style={{ flex: 1, width: '100%', height: '100%', backgroundColor: '#000' }}
+      style={{ width: '100%', height: '100%', minHeight: 200, backgroundColor: '#000' }}
       allowsInlineMediaPlayback
       mediaPlaybackRequiresUserAction={false}
       javaScriptEnabled
@@ -225,7 +225,7 @@ export function MotivationVideo({
           backgroundColor: '#000',
           width: '100%',
         },
-        !style?.height && !style?.width && { aspectRatio: 9 / 16 },
+        !style?.height && { aspectRatio: 9 / 16 },
         style,
       ]}
       pointerEvents={strictBlock ? 'box-none' : 'auto'}

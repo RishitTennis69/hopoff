@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Process
 import android.provider.Settings
@@ -71,7 +72,38 @@ class HopoffDeviceModule : Module() {
           }
           true
         } catch (_: PackageManager.NameNotFoundException) {
-          pm.getLaunchIntentForPackage(pkg) != null
+          if (pm.getLaunchIntentForPackage(pkg) != null) return@filter true
+          val main = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setPackage(pkg)
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            pm.resolveActivity(
+              main,
+              PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong()),
+            ) != null
+          } else {
+            @Suppress("DEPRECATION")
+            pm.resolveActivity(main, PackageManager.MATCH_DEFAULT_ONLY) != null
+          }
+        }
+      }
+    }
+
+    /** Scheme probe via PackageManager — respects manifest queries intent filters. */
+    AsyncFunction("probeUrlSchemes") { schemes: List<String> ->
+      val pm = appContext.reactContext?.packageManager ?: return@AsyncFunction emptyList<String>()
+      schemes.filter { scheme ->
+        try {
+          val intent = Intent(Intent.ACTION_VIEW, Uri.parse("$scheme://"))
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            pm.queryIntentActivities(
+              intent,
+              PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong()),
+            ).isNotEmpty()
+          } else {
+            @Suppress("DEPRECATION")
+            pm.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY).isNotEmpty()
+          }
+        } catch (_: Exception) {
+          false
         }
       }
     }

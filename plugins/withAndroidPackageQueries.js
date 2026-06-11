@@ -16,6 +16,8 @@ const SCHEMES = [
   'twitter',
   'tiktok',
   'snssdk1128',
+  'musically',
+  'snssdk1180',
   'youtube',
   'vnd.youtube',
   'instagram',
